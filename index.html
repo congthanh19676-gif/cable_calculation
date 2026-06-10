@@ -18,22 +18,27 @@
         }
         .app-container { max-width: 1200px; width: 100%; }
         
+        /* ĐÃ SỬA: Đổi nền sang màu trắng để làm nổi bật logo màu xanh */
         .brand-header {
-            background: radial-gradient(circle at top left, #0f172a, #1e293b);
-            padding: 35px 20px; border-radius: 4px; text-align: center;
+            background: #FFFFFF !important; 
+            padding: 30px 20px; border-radius: 8px; text-align: center;
             margin-bottom: 30px; border-bottom: 5px solid #0066CC;
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.3);
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
         }
-        .brand-title {
-            font-family: 'Orbitron', sans-serif !important; font-size: 52px !important; font-weight: 900 !important;
-            letter-spacing: 4px; margin: 0; text-transform: uppercase;
-            background: linear-gradient(135deg, #FFFFFF 30%, #93C5FD 60%, #0066CC 100%);
-            -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important;
-            text-shadow: 1px 1px 0px #004494, 2px 2px 0px #004494, 3px 3px 0px #003370, 4px 4px 0px #002244;
+        
+        /* ĐÃ THÊM: CSS tối ưu riêng cho hiển thị Logo hình ảnh */
+        .brand-logo {
+            max-height: 75px; /* Giới hạn chiều cao logo để không bị quá to */
+            width: auto;
+            object-fit: contain;
+            margin-bottom: 10px;
+            display: inline-block;
         }
+        
+        /* ĐÃ SỬA: Đổi màu chữ subtitle sang màu tối để đọc rõ trên nền trắng */
         .brand-subtitle {
-            color: #94A3B8 !important; font-size: 13px !important; font-weight: 600;
-            letter-spacing: 2px; margin-top: 12px; text-transform: uppercase;
+            color: #475569 !important; font-size: 13px !important; font-weight: 700;
+            letter-spacing: 1.5px; margin-top: 10px; text-transform: uppercase;
         }
         .section-container {
             background-color: #FFFFFF !important; border: 1px solid #E2E8F0 !important;
@@ -132,7 +137,7 @@
 
 <div class="app-container">
     <div class="brand-header">
-        <div class="brand-title">VAS</div>
+        <img src="images/VAS.png" alt="VAS Logo" class="brand-logo">
         <div class="brand-subtitle">🔥ĐÓN ĐẦU XU THẾ - LÀM CHỦ NĂNG LƯỢNG🔥</div>
         <div class="brand-subtitle">🛠️ HỆ THỐNG TÍNH TOÁN KỸ THUẬT - TIẾT DIỆN CÁP - CHỌN CB 🛠️</div>
     </div>
