@@ -669,7 +669,33 @@ async function fetchFontBase64(url) {
     }
     return btoa(binary);
 }
-
+// ============================================================================
+// HÀM TẢI ẢNH TỪ THƯ MỤC VÀ CHUYỂN ĐỔI THÀNH BASE64 (DÀNH CHO TRÌNH DUYỆT)
+// ============================================================================
+function getWatermarkImage(imageUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        // Cho phép tải ảnh chéo miền (quan trọng khi chạy trên Github Pages)
+        img.setAttribute('crossOrigin', 'anonymous'); 
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            resolve({
+                base64: canvas.toDataURL('image/png'),
+                width: img.width,
+                height: img.height
+            });
+        };
+        img.onerror = (error) => reject(error);
+        img.src = imageUrl;
+    });
+}
+// ============================================================================
+// XUẤT PDF TRỰC TIẾP TỪ DỮ LIỆU SỬ DỤNG jsPDF & jsPDF-AutoTable (Native PDF)
+// ============================================================================
 // ============================================================================
 // XUẤT PDF TRỰC TIẾP TỪ DỮ LIỆU SỬ DỤNG jsPDF & jsPDF-AutoTable (Native PDF)
 // ============================================================================
@@ -696,10 +722,19 @@ async function generatePDF() {
                     now.toLocaleTimeString('en-US', {hour12: true, hour: '2-digit', minute:'2-digit', second:'2-digit'});
 
     try {
+        // --- 1. TẢI ẢNH WATERMARK TRƯỚC KHI TẠO PDF ---
+        let watermark = null;
+        try {
+            // Tải ảnh từ thư mục images. 
+            watermark = await getWatermarkImage('images/VAS.png');
+        } catch (imgErr) {
+            console.warn("Lưu ý: Không thể tải ảnh watermark (Có thể do chạy file .html offline hoặc sai đường dẫn). Hệ thống vẫn tiếp tục xuất PDF.", imgErr);
+        }
+
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
-        // 1. Tải và thiết lập Font tiếng Việt (Roboto) từ thư viện mã nguồn mở CDN
+        // 2. Tải và thiết lập Font tiếng Việt (Roboto)
         const robotoRegular = await fetchFontBase64('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf');
         const robotoMedium = await fetchFontBase64('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Medium.ttf');
 
@@ -716,9 +751,9 @@ async function generatePDF() {
         // ================= VẼ Ô NOTICE =================
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.8);
-        doc.rect(14, startY, 182, 45, 'D'); // Khung ngoài (Rút gọn chiều cao 45)
+        doc.rect(14, startY, 182, 45, 'D'); 
         
-        doc.setFillColor(0, 102, 255); // Nền xanh của tiêu đề
+        doc.setFillColor(0, 102, 255); 
         doc.rect(14.4, startY + 0.4, 181.2, 7, 'F'); 
         
         doc.setFont("Roboto", "bold");
@@ -816,10 +851,6 @@ async function generatePDF() {
 
         // ---- 3. CABLE & ENVIRONMENT CALCULATION NOTES ----
         finalY = doc.lastAutoTable.finalY + 10;
-        
-        // SỬA ĐỔI 1: Bảng 3.1 có khoảng 13 hàng (~90mm), cộng tiêu đề 10mm -> Cần ít nhất 100mm khoảng trống.
-        // Giới hạn trang A4 là 297mm - 25mm (margin bottom) = 272mm. Vậy 272 - 100 = 172mm.
-        // Nếu vượt quá 170mm, chủ động ngắt toàn bộ Mục 3 sang trang mới để không bị rách bảng.
         if (finalY > 170) { 
             doc.addPage(); 
             finalY = 35; 
@@ -857,13 +888,9 @@ async function generatePDF() {
 
         // ---- 3.2 & 3.3 VOLTAGE DROP & SHORT CIRCUIT ----
         finalY = doc.lastAutoTable.finalY;
-        
         doc.autoTable({
             startY: finalY + 5,
             theme: 'grid',
-            // SỬA ĐỔI 2: Sử dụng thuộc tính pageBreak: 'avoid'
-            // Vì tiêu đề 3.2 và 3.3 nằm TRONG body của autoTable, lệnh này sẽ đẩy nguyên khối bảng này
-            // sang trang mới nếu trang hiện tại không đủ chứa toàn bộ 8 hàng của nó.
             pageBreak: 'avoid', 
             styles: { fontSize: 9, textColor: 0, font: "Roboto" },
             columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' } },
@@ -884,9 +911,6 @@ async function generatePDF() {
 
         // ---- 4. CONCLUSION ----
         finalY = doc.lastAutoTable.finalY + 10;
-        
-        // SỬA ĐỔI 3: Mục 4 gồm tiêu đề + bảng 4 hàng (~45mm). 272 - 45 = 227mm.
-        // Hạ điều kiện xuống 225 để tránh việc tiêu đề nằm ở trang này còn bảng lọt sang trang sau.
         if (finalY > 225) { 
             doc.addPage(); 
             finalY = 35; 
@@ -901,7 +925,7 @@ async function generatePDF() {
         doc.autoTable({
             startY: finalY + 10,
             theme: 'grid',
-            pageBreak: 'avoid', // SỬA ĐỔI 4: Đảm bảo khối kết luận luôn đi liền mạch với nhau
+            pageBreak: 'avoid',
             styles: { fontSize: 10, textColor: 0, font: "Roboto" },
             columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: [0, 102, 51] } },
             body: [
@@ -913,13 +937,34 @@ async function generatePDF() {
             margin: { top: 35, bottom: 25, left: 14, right: 14 }
         });
 
-        // ---- HEADER & FOOTER CHO TOÀN BỘ CÁC TRANG ----
-        // (Giữ nguyên logic của bạn vì vòng lặp cuối này sẽ tự động nhận diện chính xác tổng số trang mới)
+        // ---- HEADER, WATERMARK & FOOTER CHO TOÀN BỘ CÁC TRANG ----
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
             
-            // Header
+            // 1. VẼ WATERMARK (NẾU TẢI ẢNH THÀNH CÔNG)
+            if (watermark) {
+                doc.saveGraphicsState();
+                doc.setGState(new doc.GState({ opacity: 0.08 })); // Độ mờ 8%
+
+                // Tính toán tỷ lệ ảnh để không bị méo (Max Width = 160mm)
+                let imgWidth = 160;
+                let imgHeight = (watermark.height / watermark.width) * imgWidth;
+
+                // Nếu ảnh quá cao, cố định lại theo chiều cao
+                if (imgHeight > 200) {
+                    imgHeight = 160;
+                    imgWidth = (watermark.width / watermark.height) * imgHeight;
+                }
+
+                const imgX = (210 - imgWidth) / 2;  
+                const imgY = (297 - imgHeight) / 2; 
+
+                doc.addImage(watermark.base64, 'PNG', imgX, imgY, imgWidth, imgHeight);
+                doc.restoreGraphicsState();
+            }
+
+            // 2. Header
             doc.setFontSize(16);
             doc.setTextColor(0, 102, 204);
             doc.setFont("Roboto", "bold");
@@ -938,7 +983,7 @@ async function generatePDF() {
             doc.setFont("Roboto", "normal");
             doc.text(`Project: ${projName} | ${timestamp}`, 14, 28);
 
-            // Footer
+            // 3. Footer
             doc.setFontSize(7);
             doc.setTextColor(150, 150, 150);
             doc.setFont("Roboto", "italic");
@@ -946,8 +991,8 @@ async function generatePDF() {
             doc.setDrawColor(200, 200, 200);
             doc.line(14, 278, 196, 278);
             doc.text("This documentation is not intended as a substitute for and is not to be used for determining suitability or reliability of these products for specific user applications.", 14, 281);
-			doc.text("It is the duty of any such user or integrator to perform the appropriate and complete risk analysis, evaluation and testing of the products with respect to the relevant specific application", 14, 284);
-			doc.text("or use thereof.", 14, 287);
+            doc.text("It is the duty of any such user or integrator to perform the appropriate and complete risk analysis, evaluation and testing of the products with respect to the relevant specific application", 14, 284);
+            doc.text("or use thereof.", 14, 287);
             doc.text(`Project: ${projName} | Generated at: ${timestamp} | Page ${i}/${pageCount}`, 14, 290);
         }
 
