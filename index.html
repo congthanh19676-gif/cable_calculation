@@ -816,8 +816,14 @@ async function generatePDF() {
 
         // ---- 3. CABLE & ENVIRONMENT CALCULATION NOTES ----
         finalY = doc.lastAutoTable.finalY + 10;
-        // Kiểm tra xem có cần ngắt trang không
-        if (finalY > 240) { doc.addPage(); finalY = 35; }
+        
+        // SỬA ĐỔI 1: Bảng 3.1 có khoảng 13 hàng (~90mm), cộng tiêu đề 10mm -> Cần ít nhất 100mm khoảng trống.
+        // Giới hạn trang A4 là 297mm - 25mm (margin bottom) = 272mm. Vậy 272 - 100 = 172mm.
+        // Nếu vượt quá 170mm, chủ động ngắt toàn bộ Mục 3 sang trang mới để không bị rách bảng.
+        if (finalY > 170) { 
+            doc.addPage(); 
+            finalY = 35; 
+        }
         
         doc.setFillColor(238, 238, 238);
         doc.rect(14, finalY, 182, 8, 'F');
@@ -851,11 +857,14 @@ async function generatePDF() {
 
         // ---- 3.2 & 3.3 VOLTAGE DROP & SHORT CIRCUIT ----
         finalY = doc.lastAutoTable.finalY;
-        if (finalY > 240) { doc.addPage(); finalY = 35; }
         
         doc.autoTable({
             startY: finalY + 5,
             theme: 'grid',
+            // SỬA ĐỔI 2: Sử dụng thuộc tính pageBreak: 'avoid'
+            // Vì tiêu đề 3.2 và 3.3 nằm TRONG body của autoTable, lệnh này sẽ đẩy nguyên khối bảng này
+            // sang trang mới nếu trang hiện tại không đủ chứa toàn bộ 8 hàng của nó.
+            pageBreak: 'avoid', 
             styles: { fontSize: 9, textColor: 0, font: "Roboto" },
             columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' } },
             body: [
@@ -875,7 +884,13 @@ async function generatePDF() {
 
         // ---- 4. CONCLUSION ----
         finalY = doc.lastAutoTable.finalY + 10;
-        if (finalY > 240) { doc.addPage(); finalY = 35; }
+        
+        // SỬA ĐỔI 3: Mục 4 gồm tiêu đề + bảng 4 hàng (~45mm). 272 - 45 = 227mm.
+        // Hạ điều kiện xuống 225 để tránh việc tiêu đề nằm ở trang này còn bảng lọt sang trang sau.
+        if (finalY > 225) { 
+            doc.addPage(); 
+            finalY = 35; 
+        }
 
         doc.setFillColor(238, 238, 238);
         doc.rect(14, finalY, 182, 8, 'F');
@@ -886,6 +901,7 @@ async function generatePDF() {
         doc.autoTable({
             startY: finalY + 10,
             theme: 'grid',
+            pageBreak: 'avoid', // SỬA ĐỔI 4: Đảm bảo khối kết luận luôn đi liền mạch với nhau
             styles: { fontSize: 10, textColor: 0, font: "Roboto" },
             columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: [0, 102, 51] } },
             body: [
@@ -898,6 +914,7 @@ async function generatePDF() {
         });
 
         // ---- HEADER & FOOTER CHO TOÀN BỘ CÁC TRANG ----
+        // (Giữ nguyên logic của bạn vì vòng lặp cuối này sẽ tự động nhận diện chính xác tổng số trang mới)
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
