@@ -1026,14 +1026,40 @@ async function generatePDF() {
     }
 }
 // ============================================================================
-// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (TẠO TRANG IN VĂN BẢN ĐỂ COPY WORD / LƯU PDF)
-// ============================================================================
-// ============================================================================
-// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (TẠO TRANG IN VĂN BẢN ĐỂ COPY WORD / LƯU PDF)
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CÓ BẢO MẬT & NHẬN DIỆN CHẶN POPUP)
 // ============================================================================
 function exportExplanation() {
     if(!currentResult) {
         alert("Vui lòng chạy tính toán trước khi xuất thuyết minh!");
+        return;
+    }
+
+    // ------------------------------------------------------------------------
+    // CẤU HÌNH MẬT KHẨU TẠI ĐÂY
+    // ------------------------------------------------------------------------
+    const PASSWORD_PROTECT = "ThanhPro"; 
+    
+    // 1. Hỏi mật khẩu ngay tại tab hiện tại để không bị khuất
+    let userPassword = prompt("Vui lòng nhập mật khẩu để xuất Thuyết minh tính toán chi tiết:");
+    
+    // 2. Kiểm tra nếu người dùng bấm "Hủy" (Cancel)
+    if (userPassword === null) {
+        return; 
+    }
+    
+    // 3. Kiểm tra tính đúng đắn của mật khẩu
+    if (userPassword !== PASSWORD_PROTECT) {
+        alert("🔒 Mật khẩu không chính xác! Bạn không có quyền xuất tài liệu này.");
+        return;
+    }
+    // ------------------------------------------------------------------------
+
+    // 4. Nếu pass đúng, mở tab mới
+    let newWin = window.open("", "_blank");
+
+    // 5. CẢNH BÁO POPUP BLOCKER: Nếu newWin bị null nghĩa là trình duyệt đã chặn
+    if (!newWin) {
+        alert("⚠️ Trình duyệt của bạn đã chặn tự động mở Tab mới (Popup Blocker).\n\n👉 CÁCH KHẮC PHỤC: Hãy nhìn lên góc phải của thanh địa chỉ trình duyệt, click vào biểu tượng ❌ màu đỏ (hoặc thông báo 'Đã chặn cửa sổ bật lên'), chọn 'Luôn cho phép' và bấm nút xuất tài liệu lại nhé!");
         return;
     }
 
@@ -1140,8 +1166,7 @@ function exportExplanation() {
     </html>
     `;
 
-    // Mở ra 1 tab/cửa sổ mới và ghi nội dung văn bản vào đó
-    let newWin = window.open("", "_blank");
+    // 6. Ghi nội dung vào tab đã mở
     newWin.document.write(htmlContent);
     newWin.document.close();
 }
