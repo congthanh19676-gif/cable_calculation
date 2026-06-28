@@ -283,7 +283,8 @@
 
     <button class="btn-primary" onclick="runCalculation()">🚀 TÍNH TOÁN CHỌN CÁP VÀ CB</button>
     <button class="btn-pdf" id="btn_open_modal" onclick="openModal()">📥 XUẤT BÁO CÁO PDF (CABLE CALCULATION REPORT)</button>
-
+    
+    <button class="btn-pdf" id="btn_explanation" onclick="exportExplanation()" style="background-color: #F59E0B; margin-top: 15px; display: none;">📝 XUẤT FILE THUYẾT MINH TÍNH TOÁN CHI TIẾT</button>
     <div id="result_zone" class="result-zone">
         <div class="result-main-title">🔥 KẾT QUẢ TÍNH TOÁN HỆ THỐNG</div>
         <div id="error_msg" class="error-box" style="display:none;"></div>
@@ -459,6 +460,9 @@ function runCalculation() {
     document.getElementById("result_zone").style.display = "block";
     let err = document.getElementById("error_msg"); let content = document.getElementById("success_content");
     err.style.display = "none"; content.innerHTML = ""; document.getElementById("btn_open_modal").style.display = "none";
+
+    // BẠN THÊM DÒNG NÀY VÀO ĐÂY ĐỂ ẨN NÚT KHI BẮT ĐẦU TÍNH LẠI:
+    document.getElementById("btn_explanation").style.display = "none";
 
     let sysType = document.getElementById("system_type").value;
     let U = parseFloat(document.getElementById("voltage").value);
@@ -651,8 +655,12 @@ function runCalculation() {
     <p style='font-size:12px; color: #64748B; text-align:center;'>💡 Kết quả tính toán chỉ mang tính tham khảo. Vui lòng kiểm tra lại thông số thiết bị trước khi áp dụng thực tế.</p>
     `;
 
+    // ... (code tạo biến html) ...
     content.innerHTML = html;
     document.getElementById("btn_open_modal").style.display = "block";
+    
+    // BẠN THÊM DÒNG NÀY VÀO ĐÂY ĐỂ HIỂN THỊ NÚT THUYẾT MINH LÊN:
+    document.getElementById("btn_explanation").style.display = "block";
 }
 
 // ============================================================================
@@ -1016,6 +1024,126 @@ async function generatePDF() {
         btnConfirm.disabled = false;
         alert("Có lỗi xảy ra khi tạo PDF. Hãy đảm bảo bạn có kết nối mạng để hệ thống tải font chữ tiếng Việt.");
     }
+}
+// ============================================================================
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (TẠO TRANG IN VĂN BẢN ĐỂ COPY WORD / LƯU PDF)
+// ============================================================================
+// ============================================================================
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (TẠO TRANG IN VĂN BẢN ĐỂ COPY WORD / LƯU PDF)
+// ============================================================================
+function exportExplanation() {
+    if(!currentResult) {
+        alert("Vui lòng chạy tính toán trước khi xuất thuyết minh!");
+        return;
+    }
+
+    let sys = currentResult.sysType;
+    let U = sys === "3 pha" ? 400 : 230;
+    let is3Phase = sys === "3 pha";
+
+    // Khởi tạo nội dung văn bản HTML
+    let htmlContent = `
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <title>Thuyết Minh Tính Toán Cáp & CB</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap');
+            body { font-family: 'Times New Roman', Times, serif; line-height: 1.5; color: #000; padding: 40px; max-width: 800px; margin: 0 auto; }
+            h1 { text-align: center; font-size: 20px; text-transform: uppercase; margin-bottom: 30px;}
+            h2 { font-size: 16px; border-bottom: 1px solid #000; padding-bottom: 5px; margin-top: 30px; text-transform: uppercase;}
+            p { font-size: 15px; margin: 10px 0; text-align: justify; }
+            ul { font-size: 15px; line-height: 1.6; }
+            li { margin-bottom: 8px; text-align: justify; }
+            .formula { text-align: center; font-style: italic; font-size: 16px; margin: 15px 0; font-weight: bold;}
+            .highlight { background-color: #f0f0f0; padding: 15px; border-left: 4px solid #000; margin: 15px 0;}
+            @media print {
+                body { padding: 0; max-width: 100%; }
+                .no-print { display: none; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="no-print" style="text-align: right; margin-bottom: 20px;">
+            <button onclick="window.print()" style="padding: 10px 20px; background: #0066CC; color: white; border: none; cursor: pointer; font-weight: bold; font-family: sans-serif;">🖨️ IN HOẶC LƯU FILE PDF</button>
+            <p style="font-family: sans-serif; font-size: 13px; color: #666;">(Mẹo: Bạn có thể ấn Ctrl+A và Ctrl+C để copy toàn bộ nội dung dán vào Word)</p>
+        </div>
+
+        <h1>THUYẾT MINH TÍNH TOÁN KỸ THUẬT<br>LỰA CHỌN TIẾT DIỆN CÁP VÀ THIẾT BỊ ĐÓNG CẮT</h1>
+
+        <h2>1. Cơ sở tính toán dòng điện phụ tải (I<sub>tt</sub>)</h2>
+        <p>Hệ thống điện được khai báo là <b>${sys}</b> với cấp điện áp định mức U = ${U}V. Giá trị công suất/dòng điện đầu vào khai báo là: <b>${currentResult.loadStr}</b>.</p>
+        <p>Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán liên tục (I<sub>tt</sub>) được xác định theo công thức:</p>
+        <div class="formula">I<sub>tt</sub> = ${is3Phase ? "S / (√3 × U)" : "S / U"} (hoặc tính từ P thông qua hệ số cosφ)</div>
+        <p>Thay số thực tế vào hệ thống, ta có dòng tính toán làm cơ sở thiết kế: <b>I<sub>tt</sub> = ${currentResult.Itt_cb} A</b>.</p>
+
+        <h2>2. Xác định hệ số hiệu chỉnh môi trường lắp đặt (K)</h2>
+        <p>Điều kiện lắp đặt khai báo là <b>${currentResult.routing}</b> (mã phương thức ${currentResult.methodDisplay} theo tiêu chuẩn TCVN 7447-5-52 / IEC 60364-5-52). Do các yếu tố môi trường và cách sắp xếp cáp, khả năng tản nhiệt bị suy giảm, hệ số hiệu chỉnh K tổng cộng được áp dụng:</p>
+        <div class="formula">K = K<sub>1</sub> × K<sub>2</sub> × K<sub>3</sub> × K<sub>4</sub></div>
+        <ul>
+            <li>Hệ số suy giảm do nhiệt độ môi trường (K<sub>1</sub>): <b>${currentResult.temp_factor}</b></li>
+            <li>Hệ số nhiệt trở suất của đất (K<sub>2</sub>): <b>${currentResult.soil_factor}</b></li>
+            <li>Hệ số độ sâu chôn cáp (K<sub>3</sub>): <b>${currentResult.depth_factor}</b></li>
+            <li>Hệ số ảnh hưởng do gom nhóm mạch/cáp (K<sub>4</sub>): <b>${currentResult.touch_factor}</b></li>
+        </ul>
+        <p>Tổng hệ số hiệu chỉnh áp dụng cho việc chọn cáp: <b>K = ${currentResult.overall_K}</b>.</p>
+
+        <h2>3. Tính toán và Lựa chọn tiết diện cáp</h2>
+        <p>Điều kiện bắt buộc: Khả năng mang dòng liên tục thực tế của hệ thống cáp (I<sub>z_total</sub>) sau khi đã hiệu chỉnh phải lớn hơn hoặc bằng dòng điện phụ tải (I<sub>tt</sub>):</p>
+        <div class="formula">I<sub>z_total</sub> = (I<sub>z_bảng_tra</sub> × K) × số_sợi_song_song ≥ I<sub>tt</sub></div>
+        <div class="highlight">
+            Căn cứ vòng lặp đối chiếu thuật toán với catalogue cáp <b>${currentResult.cond}</b> cách điện <b>${currentResult.insul}</b>, hệ thống đã đề xuất cấu hình: <b>${currentResult.phase_cable} mm²</b>.<br><br>
+            • Dòng định mức tra bảng của 1 mạch: ${currentResult.Iz_single / currentResult.overall_K} A.<br>
+            • Khả năng mang dòng thực tế của 1 mạch (sau hiệu chỉnh): I<sub>z</sub> = ${currentResult.Iz_single} A.<br>
+            • Tổng khả năng mang dòng của thiết kế: <b>I<sub>z_total</sub> = ${currentResult.Iz_total} A</b>.
+        </div>
+        <p>Vì <b>${currentResult.Iz_total} A ≥ ${currentResult.Itt_cb} A</b>, cấu hình cáp này hoàn toàn đạt yêu cầu về khả năng mang tải nhiệt liên tục.</p>
+
+        <h2>4. Kiểm tra điều kiện sụt áp (ΔU)</h2>
+        <p>Tiết diện cáp được kiểm tra chéo với điều kiện sụt áp, đảm bảo phần trăm sụt áp tại cuối đường dây không vượt quá mức cho phép (${currentResult.dU_limit}%).</p>
+        <div class="formula">ΔU = ${is3Phase ? "√3" : "2"} × I<sub>tt</sub> × L × (R<sub>t</sub> × cosφ + X × sinφ) / (1000 × n)</div>
+        <p>Trong đó, điện trở phần ứng của cáp ở nhiệt độ làm việc cực đại định mức (${currentResult.t_fixed}°C) là R<sub>t</sub> = ${currentResult.rt_val} Ω/km. Chiều dài tuyến cáp L = ${currentResult.length} m.</p>
+        <p><b>Kết quả kiểm tra:</b></p>
+        <ul>
+            <li>Độ sụt áp tuyệt đối: <b>ΔU = ${currentResult.dU_val} V</b></li>
+            <li>Tỷ lệ sụt áp tương đối: <b>%ΔU = ${currentResult.dU_percent}% ≤ ${currentResult.dU_limit}%</b> (Đạt điều kiện)</li>
+        </ul>
+
+        <h2>5. Tính toán dòng ngắn mạch điểm chạm (I<sub>sc</sub>) và Các giả thiết kỹ thuật</h2>
+        <p>Dòng ngắn mạch được tính toán theo phương pháp trở kháng (Impedance Method). Tính toán dựa trên việc quy đổi tổng trở từ trạm biến áp nguồn (Z<sub>ba</sub>) và tổng trở của đường dây cáp tương đương (Z<sub>cable</sub>) về điểm xảy ra sự cố.</p>
+        <div class="formula">I<sub>k3</sub> = U / (√3 × ΣZ)</div>
+        <p>Kết quả tính toán cường độ dòng điện ngắn mạch chạm chập 3 pha cực đại tại điểm cuối tuyến cáp là: <b>I<sub>k3</sub> = ${currentResult.Ik3_str}</b>. Thông số này dùng làm cơ sở để chọn năng lực cắt của thiết bị đóng cắt.</p>
+        
+        <p><b>Các cơ sở kỹ thuật và giả thiết đơn giản hóa áp dụng trong thuật toán phần mềm:</b></p>
+        <ul>
+            <li><b>Bỏ qua tổng trở lưới điện phía thượng nguồn (Z<sub>up</sub>):</b> Trong thực tế công thức gốc là I<sub>sc</sub> = U / [√3 × (Z<sub>up</sub> + Z<sub>T</sub>)]. Tuy nhiên, khi công suất ngắn mạch nguồn thượng nguồn (S<sub>sc</sub>) lớn hơn rất nhiều so với công suất định mức trạm biến áp hạ thế (S<sub>n</sub>), phần mềm xem lưới điện thượng nguồn là lưới vô hạn (Z<sub>up</sub> = 0). Đây là phương pháp thực hành phổ biến khi thiết kế tủ điện hạ thế nhỏ và vừa, cho kết quả tính toán nhanh chóng, thiên về an toàn với sai số tăng thêm chỉ khoảng 5%.</li>
+            <li><b>Bỏ qua đóng góp dòng ngắn mạch của động cơ không đồng bộ:</b> Khi xảy ra sự cố, các động cơ lớn đang vận hành có khả năng phát ngược dòng ngắn mạch vào lưới (khoảng 4.8 × I<sub>n_động_cơ</sub>) trong vài chu kỳ đầu. Do ứng dụng tính toán dựa trên mô hình phụ tải tổng quát và không yêu cầu người dùng khai báo tỷ lệ tải động cơ chi tiết, thành phần này được đơn giản hóa lược bỏ.</li>
+            <li><b>Bỏ qua điện trở của thiết bị đóng cắt (Switchgear impedance):</b> Thực tế cần cộng thêm khoảng 0.15 mΩ điện trở tiếp xúc cho mỗi CB bảo vệ trên tuyến dây. Tuy nhiên ở lưới hạ thế, giá trị trở kháng này rất nhỏ, sai số gây ra không đáng kể nên phần mềm được cấu hình bỏ qua để tối ưu hóa bài toán tính toán trở kháng.</li>
+            <li><b>Nhiệt độ tính toán điện trở cáp (R<sub>p</sub>):</b> Đối với bài toán tính dòng ngắn mạch kiểm tra điều kiện cắt của CB, giá trị cốt lõi cần tìm là dòng ngắn mạch lớn nhất có thể xảy ra nhằm lựa chọn dòng cắt tới hạn (I<sub>cu</sub>) an toàn. Do đó, điện trở cáp được thuật toán gọi trực tiếp từ bảng tra thông số kỹ thuật gốc ở nhiệt độ tiêu chuẩn 20°C (r_phys) thay vì nhiệt độ hoạt động cực đại (như khi tính ngắn mạch cực tiểu). Cách làm này đảm bảo tính ra được <b>Dòng ngắn mạch cực đại (Maximum short-circuit current)</b> chính xác nhất phục vụ việc phối hợp thiết bị an toàn.</li>
+        </ul>
+
+        <h2>6. Chọn lựa thiết bị đóng cắt bảo vệ (CB)</h2>
+        <p>Căn cứ theo tiêu chuẩn thiết kế lắp đặt điện, CB bảo vệ cáp phải thỏa mãn đồng thời hai điều kiện vật lý cốt lõi:</p>
+        <ul>
+            <li><b>Điều kiện bảo vệ quá tải:</b> I<sub>tt</sub> ≤ I<sub>n</sub> (hoặc I<sub>r</sub> chỉnh định) ≤ I<sub>z_total</sub></li>
+            <li><b>Điều kiện cắt ngắn mạch:</b> I<sub>cu</sub> (Khả năng cắt ngắn mạch tới hạn) ≥ I<sub>k3</sub></li>
+        </ul>
+        <div class="highlight">
+            <b>CẤU HÌNH CB ĐỀ XUẤT:</b><br><br>
+            • Chọn dòng định mức (I<sub>n</sub>) là: <b>${currentResult.cb_In} A</b> (Phù hợp vì ${currentResult.Itt_cb} A ≤ ${currentResult.cb_In} A ≤ ${currentResult.Iz_total} A).<br>
+            • Chọn khả năng cắt ngắn mạch tối thiểu (I<sub>cu</sub>) là: <b>${currentResult.cb_Icu} kA</b> (Đảm bảo cắt an toàn dòng sự cố ${currentResult.Ik3_str}).
+        </div>
+        <br><br><br>
+        <p style="text-align: right; font-style: italic;">---- Hết tài liệu thuyết minh ----</p>
+    </body>
+    </html>
+    `;
+
+    // Mở ra 1 tab/cửa sổ mới và ghi nội dung văn bản vào đó
+    let newWin = window.open("", "_blank");
+    newWin.document.write(htmlContent);
+    newWin.document.close();
 }
 </script>
 </body>
