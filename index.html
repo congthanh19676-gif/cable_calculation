@@ -702,331 +702,7 @@ function getWatermarkImage(imageUrl) {
     });
 }
 // ============================================================================
-// XUẤT PDF TRỰC TIẾP TỪ DỮ LIỆU SỬ DỤNG jsPDF & jsPDF-AutoTable (Native PDF)
-// ============================================================================
-// ============================================================================
-// XUẤT PDF TRỰC TIẾP TỪ DỮ LIỆU SỬ DỤNG jsPDF & jsPDF-AutoTable (Native PDF)
-// ============================================================================
-async function generatePDF() {
-    if(!currentResult) return;
-    
-    let btnConfirm = document.getElementById("btn_confirm_pdf");
-    let originalText = btnConfirm.innerHTML;
-    btnConfirm.innerHTML = "⏳ ĐANG XUẤT PDF TRỰC TIẾP...";
-    btnConfirm.disabled = true;
-
-    // Lấy thông tin
-    let engineerName = document.getElementById("pdf_engineer").value;
-    let projName = document.getElementById("pdf_project").value;
-    let companyName = document.getElementById("pdf_company").value;
-    let custName = document.getElementById("pdf_customer").value;
-    let feedName = document.getElementById("pdf_feeder").value;
-
-    let firstName = engineerName.split(' ')[0];
-    let lastName = engineerName.split(' ').slice(1).join(' ') || engineerName;
-
-    let now = new Date();
-    let timestamp = ("0" + now.getDate()).slice(-2) + "/" + ("0" + (now.getMonth() + 1)).slice(-2) + "/" + now.getFullYear() + " " + 
-                    now.toLocaleTimeString('en-US', {hour12: true, hour: '2-digit', minute:'2-digit', second:'2-digit'});
-
-    try {
-        // --- 1. TẢI ẢNH WATERMARK TRƯỚC KHI TẠO PDF ---
-        let watermark = null;
-        try {
-            // Tải ảnh từ thư mục images. 
-            watermark = await getWatermarkImage('images/VAS.png');
-        } catch (imgErr) {
-            console.warn("Lưu ý: Không thể tải ảnh watermark (Có thể do chạy file .html offline hoặc sai đường dẫn). Hệ thống vẫn tiếp tục xuất PDF.", imgErr);
-        }
-
-        const { jsPDF } = window.jspdf;
-		const doc = new jsPDF({
-    		encryption: {
-       			ownerPassword: "thanhpro", // Bạn có thể đặt một mật khẩu phức tạp của riêng bạn
-        		userPermissions: ["print"] // Chỉ cấp quyền in ấn. Không khai báo "modify".
-    		}
-		});
-
-        // 2. Tải và thiết lập Font tiếng Việt (Roboto)
-        const robotoRegular = await fetchFontBase64('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf');
-        const robotoMedium = await fetchFontBase64('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Medium.ttf');
-
-        doc.addFileToVFS("Roboto-Regular.ttf", robotoRegular);
-        doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
-        
-        doc.addFileToVFS("Roboto-Medium.ttf", robotoMedium);
-        doc.addFont("Roboto-Medium.ttf", "Roboto", "bold");
-        
-        doc.setFont("Roboto", "normal"); 
-
-        let startY = 35;
-        
-        // ================= VẼ Ô NOTICE =================
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.8);
-        doc.rect(14, startY, 182, 45, 'D'); 
-        
-        doc.setFillColor(0, 102, 255); 
-        doc.rect(14.4, startY + 0.4, 181.2, 7, 'F'); 
-        
-        doc.setFont("Roboto", "bold");
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(12);
-        doc.text("NOTICE", 105, startY + 5.2, { align: "center", fontStyle: 'italic' });
-        
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(11);
-        doc.text("RISK OF INACCURATE DATA RESULTS", 18, startY + 14);
-        
-        doc.setFont("Roboto", "normal");
-        doc.setFontSize(10);
-        doc.text("• Make sure that you have provided all the required inputs for the conductor sizing.", 22, startY + 22);
-        doc.text("• It is recommended to refer to the cable manufacturer's catalogue before making the selection.", 22, startY + 28);
-        
-        doc.setFont("Roboto", "bold");
-        doc.text("Failure to follow these instructions can result in incorrect bill of material and loss of business.", 18, startY + 38);
-        
-        // ================= MỤC LỤC =================
-        let tocY = startY + 55;
-        doc.setFontSize(14);
-        doc.setTextColor(0, 102, 204);
-        doc.text("Content", 14, tocY);
-        
-        doc.autoTable({
-            startY: tocY + 3,
-            theme: 'plain',
-            styles: { fontSize: 11, font: "Roboto", cellPadding: 2.5, textColor: 0 },
-            body: [
-                ['1. Information'],
-                ['2. Cable schedule'],
-                ['3. Calculation notes'],
-                ['    3.1. Cable & Environment Parameters'],
-                ['    3.2. Voltage Drop Check'],
-                ['    3.3. Short Circuit (Calculation of Isc by the impedance method)'],
-                ['4. Conclusion - Bill of Materials']
-            ],
-            margin: { left: 14, right: 14 }
-        });
-
-        // ================= NGẮT TRANG =================
-        doc.addPage();
-        
-        // ---- 1. INFORMATION ----
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.setFillColor(238, 238, 238);
-        doc.rect(14, 35, 182, 8, 'F');
-        doc.setFont("Roboto", "bold");
-        doc.text("1. Information", 16, 40.5);
-        
-        doc.autoTable({
-            startY: 45,
-            theme: 'grid',
-            styles: { fontSize: 10, textColor: 0, font: "Roboto" },
-            columnStyles: { 0: { fontStyle: 'bold', fillColor: [250, 250, 250], cellWidth: 50 } },
-            body: [
-                ['Name:', lastName],
-                ['First name:', firstName],
-                ['Company:', companyName],
-                ['Customer:', custName]
-            ],
-            margin: { top: 35, bottom: 25, left: 14, right: 14 }
-        });
-
-        // ---- 2. CABLE SCHEDULE ----
-        let finalY = doc.lastAutoTable.finalY + 10;
-        doc.setFillColor(238, 238, 238);
-        doc.rect(14, finalY, 182, 8, 'F');
-        doc.setFontSize(12);
-        doc.setFont("Roboto", "bold");
-        doc.text("2. Cable schedule", 16, finalY + 5.5);
-        
-        doc.autoTable({
-            startY: finalY + 10,
-            theme: 'grid',
-            headStyles: { fillColor: [221, 221, 221], textColor: 0, fontStyle: 'bold', halign: 'center', valign: 'middle', font: "Roboto" },
-            styles: { fontSize: 9, textColor: 0, halign: 'center', valign: 'middle', font: "Roboto" },
-            head: [['Feeder', 'Load type', 'Load', 'Type Insulation', 'L', 'Active conductor', 'PE/PEN / N', 'dU']],
-            body: [
-                [
-                    feedName, 
-                    currentResult.sysType === "3 pha" ? "3Ph+N" : "1Ph+N",
-                    currentResult.loadStr,
-                    `Single-core\n${currentResult.insul.split('/')[0]}`,
-                    `${currentResult.length} m`,
-                    `${currentResult.phase_cable}\n${currentResult.cond}`,
-                    `${currentResult.n_cable}\n${currentResult.cond}`,
-                    `${currentResult.dU_percent}%`
-                ]
-            ],
-            margin: { top: 35, bottom: 25, left: 14, right: 14 }
-        });
-
-        // ---- 3. CABLE & ENVIRONMENT CALCULATION NOTES ----
-        finalY = doc.lastAutoTable.finalY + 10;
-        if (finalY > 170) { 
-            doc.addPage(); 
-            finalY = 35; 
-        }
-        
-        doc.setFillColor(238, 238, 238);
-        doc.rect(14, finalY, 182, 8, 'F');
-        doc.setFontSize(12);
-        doc.setFont("Roboto", "bold");
-        doc.text("3. Calculation notes", 16, finalY + 5.5);
-
-        doc.autoTable({
-            startY: finalY + 10,
-            theme: 'grid',
-            styles: { fontSize: 9, textColor: 0, font: "Roboto" },
-            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' } },
-            body: [
-                [{content: '3.1. Cable & Environment Parameters', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
-                ['Length', `${currentResult.length} m`],
-                ['Installation method', `${currentResult.methodKey} - ${currentResult.methodDisplay}`],
-                ['Insulation', currentResult.insul],
-                [{content: 'Correction factors according to IEC 60364-5-52', colSpan: 2, fontStyle: 'bold', fillColor: [240, 240, 240]}],
-                ['Temperature factor (k1)', currentResult.temp_factor.toString()],
-                ['Soil thermal resistivity factor (k2)', currentResult.soil_factor.toString()],
-                ['Depth factor (k3)', currentResult.depth_factor ? currentResult.depth_factor.toString() : "-"],
-                ['Touching conductor factor (k4)', currentResult.touch_factor.toString()],
-                [{content: 'Overall factor (K)', fontStyle: 'bold'}, {content: currentResult.overall_K.toString(), fontStyle: 'bold'}],
-                [{content: 'Selected active conductor', colSpan: 2, fontStyle: 'bold', fillColor: [240, 240, 240]}],
-                ['Cross section area', `${currentResult.phase_cable} mm2`],
-                ['Core', currentResult.cond],
-                ['Iz under real conditions', `${currentResult.Iz_total} A`]
-            ],
-            margin: { top: 35, bottom: 25, left: 14, right: 14 }
-        });
-
-        // ---- 3.2 & 3.3 VOLTAGE DROP & SHORT CIRCUIT ----
-        finalY = doc.lastAutoTable.finalY;
-        doc.autoTable({
-            startY: finalY + 5,
-            theme: 'grid',
-            pageBreak: 'avoid', 
-            styles: { fontSize: 9, textColor: 0, font: "Roboto" },
-            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' } },
-            body: [
-                [{content: '3.2. Voltage Drop Check', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
-                [`Core temperature (steady state)`, `${currentResult.t_fixed} °C`],
-                [`Cable resistance Rt`, `${currentResult.rt_val} Ω/km`],
-                [`Calculated voltage drop`, `${currentResult.dU_val} V (${currentResult.dU_percent}%)`],
-                [`Maximum allowable voltage drop`, `${currentResult.dU_limit}%`],
-                
-                [{content: '3.3. Short Circuit', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
-                ['Max 3-phase short-circuit (Ik3)', currentResult.Ik3_str],
-                ['2-phase short-circuit (Ik2)', currentResult.Ik2_str],
-                ['Min 1-phase short-circuit (Ik1)', currentResult.Ik1_str],
-            ],
-            margin: { top: 35, bottom: 25, left: 14, right: 14 }
-        });
-
-        // ---- 4. CONCLUSION ----
-        finalY = doc.lastAutoTable.finalY + 10;
-        if (finalY > 225) { 
-            doc.addPage(); 
-            finalY = 35; 
-        }
-
-        doc.setFillColor(238, 238, 238);
-        doc.rect(14, finalY, 182, 8, 'F');
-        doc.setFontSize(12);
-        doc.setFont("Roboto", "bold");
-        doc.text("4. Conclusion - Bill of Materials", 16, finalY + 5.5);
-
-        doc.autoTable({
-            startY: finalY + 10,
-            theme: 'grid',
-            pageBreak: 'avoid',
-            styles: { fontSize: 10, textColor: 0, font: "Roboto" },
-            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: [0, 102, 51] } },
-            body: [
-                ['Selected Phase Cable', `${currentResult.phase_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
-                ['Selected Neutral Cable', `${currentResult.n_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
-                ['Circuit Breaker Rating (In)', `${currentResult.cb_In} A`],
-                ['Short-Circuit Breaking Capacity (Icu)', `≥ ${currentResult.cb_Icu} kA`]
-            ],
-            margin: { top: 35, bottom: 25, left: 14, right: 14 }
-        });
-
-        // ---- HEADER, WATERMARK & FOOTER CHO TOÀN BỘ CÁC TRANG ----
-        const pageCount = doc.internal.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            
-            // 1. VẼ WATERMARK (NẾU TẢI ẢNH THÀNH CÔNG)
-            if (watermark) {
-                doc.saveGraphicsState();
-                doc.setGState(new doc.GState({ opacity: 0.08 })); // Độ mờ 8%
-
-                // Tính toán tỷ lệ ảnh để không bị méo (Max Width = 160mm)
-                let imgWidth = 160;
-                let imgHeight = (watermark.height / watermark.width) * imgWidth;
-
-                // Nếu ảnh quá cao, cố định lại theo chiều cao
-                if (imgHeight > 200) {
-                    imgHeight = 160;
-                    imgWidth = (watermark.width / watermark.height) * imgHeight;
-                }
-
-                const imgX = (210 - imgWidth) / 2;  
-                const imgY = (297 - imgHeight) / 2; 
-
-                doc.addImage(watermark.base64, 'PNG', imgX, imgY, imgWidth, imgHeight);
-                doc.restoreGraphicsState();
-            }
-
-            // 2. Header
-            doc.setFontSize(16);
-            doc.setTextColor(0, 102, 204);
-            doc.setFont("Roboto", "bold");
-            doc.text(companyName, 14, 20);
-            
-            doc.setFontSize(12);
-            doc.setTextColor(0, 0, 0);
-            doc.text("Cable Calculation Report", 196, 20, { align: "right" });
-            
-            doc.setLineWidth(0.5);
-            doc.setDrawColor(0, 0, 0);
-            doc.line(14, 23, 196, 23);
-            
-            doc.setFontSize(9);
-            doc.setTextColor(100, 100, 100);
-            doc.setFont("Roboto", "normal");
-            doc.text(`Project: ${projName} | ${timestamp}`, 14, 28);
-
-            // 3. Footer
-            doc.setFontSize(7);
-            doc.setTextColor(150, 150, 150);
-            doc.setFont("Roboto", "italic");
-            doc.setLineWidth(0.1);
-            doc.setDrawColor(200, 200, 200);
-            doc.line(14, 278, 196, 278);
-            doc.text("This documentation is not intended as a substitute for and is not to be used for determining suitability or reliability of these products for specific user applications.", 14, 281);
-            doc.text("It is the duty of any such user or integrator to perform the appropriate and complete risk analysis, evaluation and testing of the products with respect to the relevant specific application", 14, 284);
-            doc.text("or use thereof.", 14, 287);
-            doc.text(`Project: ${projName} | Generated at: ${timestamp} | Page ${i}/${pageCount}`, 14, 290);
-        }
-
-        // Lưu PDF
-        let saveName = projName.replace(/\s+/g, '_') + '_Report.pdf';
-        doc.save(saveName);
-        
-        // Hoàn tất
-        btnConfirm.innerHTML = originalText;
-        btnConfirm.disabled = false;
-        closeModal();
-
-    } catch (error) {
-        console.error("Lỗi xuất PDF: ", error);
-        btnConfirm.innerHTML = originalText;
-        btnConfirm.disabled = false;
-        alert("Có lỗi xảy ra khi tạo PDF. Hãy đảm bảo bạn có kết nối mạng để hệ thống tải font chữ tiếng Việt.");
-    }
-}
-// ============================================================================
-// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CÓ BẢO MẬT & NHẬN DIỆN CHẶN POPUP)
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CẬP NHẬT: TRÍCH DẪN SỐ BẢNG TỪ PHỤ LỤC)
 // ============================================================================
 function exportExplanation() {
     if(!currentResult) {
@@ -1039,35 +715,282 @@ function exportExplanation() {
     // ------------------------------------------------------------------------
     const PASSWORD_PROTECT = "ThanhPro"; 
     
-    // 1. Hỏi mật khẩu ngay tại tab hiện tại để không bị khuất
     let userPassword = prompt("Vui lòng nhập mật khẩu để xuất Thuyết minh tính toán chi tiết:");
-    
-    // 2. Kiểm tra nếu người dùng bấm "Hủy" (Cancel)
-    if (userPassword === null) {
-        return; 
-    }
-    
-    // 3. Kiểm tra tính đúng đắn của mật khẩu
+    if (userPassword === null) return; 
     if (userPassword !== PASSWORD_PROTECT) {
         alert("🔒 Mật khẩu không chính xác! Bạn không có quyền xuất tài liệu này.");
         return;
     }
-    // ------------------------------------------------------------------------
-
-    // 4. Nếu pass đúng, mở tab mới
+    
     let newWin = window.open("", "_blank");
-
-    // 5. CẢNH BÁO POPUP BLOCKER: Nếu newWin bị null nghĩa là trình duyệt đã chặn
     if (!newWin) {
-        alert("⚠️ Trình duyệt của bạn đã chặn tự động mở Tab mới (Popup Blocker).\n\n👉 CÁCH KHẮC PHỤC: Hãy nhìn lên góc phải của thanh địa chỉ trình duyệt, click vào biểu tượng ❌ màu đỏ (hoặc thông báo 'Đã chặn cửa sổ bật lên'), chọn 'Luôn cho phép' và bấm nút xuất tài liệu lại nhé!");
+        alert("⚠️ Trình duyệt của bạn đã chặn tự động mở Tab mới (Popup Blocker).\n\n👉 CÁCH KHẮC PHỤC: Hãy click vào biểu tượng ❌ màu đỏ trên thanh địa chỉ, chọn 'Luôn cho phép' và thử lại!");
         return;
     }
 
+    // --- LẤY DỮ LIỆU TỪ CURRENT RESULT VÀ DOM ---
     let sys = currentResult.sysType;
     let U = sys === "3 pha" ? 400 : 230;
     let is3Phase = sys === "3 pha";
+    let loadStr = currentResult.loadStr;
+    let s_ba = parseFloat(document.getElementById("s_ba").value);
+    let u_k = parseFloat(document.getElementById("u_k").value);
+    let isAir = currentResult.routing === "Đi trên không/thang máng";
+    
+    // --- Xác định công thức cho đầu vào P, S, I ---
+    let formulaHTML = ""; let explanationText = "";
+    if (loadStr.includes("kW")) {
+        formulaHTML = is3Phase ? "I<sub>tt</sub> = (P × 1000) / (√3 × U × cosφ)" : "I<sub>tt</sub> = (P × 1000) / (U × cosφ)";
+        explanationText = "Đầu vào được khai báo là Công suất tác dụng P (kW). Dòng điện tính toán được quy đổi thông qua hệ số công suất cosφ.";
+    } else if (loadStr.includes("kVA")) {
+        formulaHTML = is3Phase ? "I<sub>tt</sub> = (S × 1000) / (√3 × U)" : "I<sub>tt</sub> = (S × 1000) / U";
+        explanationText = "Đầu vào được khai báo là Công suất biểu kiến S (kVA). Dòng điện tính toán được quy đổi trực tiếp từ S.";
+    } else {
+        formulaHTML = "I<sub>tt</sub> = I<sub>khai_báo</sub>";
+        explanationText = "Đầu vào được khai báo trực tiếp bằng dòng điện I (A). Giá trị tính toán sử dụng chính giá trị dòng điện đã nhập.";
+    }
 
-    // Khởi tạo nội dung văn bản HTML
+    // --- Xử lý hệ số K2, K3 (Kèm trích dẫn Bảng Phụ lục) ---
+    let k2_text = isAir ? "1.0 <i>(Chỉ áp dụng đối với trường hợp cáp đi chôn ngầm trong đất)</i>" : `<b>${currentResult.soil_factor}</b> <span style="color:#2563EB;"><i>(Tra tại Bảng 2 Phụ lục)</i></span>`;
+    let k3_text = isAir ? "1.0 <i>(Chỉ áp dụng đối với trường hợp cáp đi chôn ngầm trong đất)</i>" : `<b>${currentResult.depth_factor}</b> <span style="color:#2563EB;"><i>(Tra tại Bảng 3 Phụ lục)</i></span>`;
+    
+    let envTemp = parseInt(isAir ? document.getElementById("air_temp").value : document.getElementById("ground_temp").value);
+    let groupMethod = isAir ? document.getElementById("air_arr").value : document.getElementById("ground_arr").value;
+    
+    let phase_n = parseInt(currentResult.phase_cable.split('x')[0]);
+    let phase_a = parseFloat(currentResult.phase_cable.split('x')[1]);
+    let neut_n = parseInt(currentResult.n_cable.split('x')[0]);
+    let neut_a = parseFloat(currentResult.n_cable.split('x')[1]);
+    
+    let R0_phase = currentResult.cond === "Copper" ? (res_cu[phase_a] || 0.01) : (res_al[phase_a] || 0.01);
+    let R0_neut = currentResult.cond === "Copper" ? (res_cu[neut_a] || 0.01) : (res_al[neut_a] || 0.01);
+    let L = parseFloat(currentResult.length);
+    let alpha = currentResult.cond === "Copper" ? 0.00393 : 0.00403;
+    let t_fixed = parseFloat(currentResult.t_fixed);
+
+    // --- TÁI TÍNH TOÁN CHI TIẾT NGẮN MẠCH ---
+    let Rp = (R0_phase / 1000.0) * L / phase_n;
+    let Xp = (0.08 / 1000.0) * L / phase_n;
+    let Rn = (R0_neut / 1000.0) * L / neut_n;
+    let Xn = (0.08 / 1000.0) * L / neut_n;
+
+    let Zba = (u_k / 100.0) * Math.pow(U, 2) / (s_ba * 1000.0);
+    let Rba = 0.2 * Zba;
+    let Xba = Math.sqrt(Math.max(0.0, Zba * Zba - Rba * Rba));
+
+    let Z3 = Math.sqrt(Math.pow(Rba + Rp, 2) + Math.pow(Xba + Xp, 2));
+    let Z1 = Math.sqrt(Math.pow(Rba + Rp + Rn, 2) + Math.pow(Xba + Xp + Xn, 2));
+    let U_phase = is3Phase ? U / Math.sqrt(3) : U;
+    let Ik3 = Z3 > 0 ? U / (Math.sqrt(3) * Z3) : 0;
+
+    // --- TÍNH TOÁN IEC 60949 ---
+    let k_mat = currentResult.cond === "Copper" ? 226 : 148;
+    let beta = currentResult.cond === "Copper" ? 234.5 : 228;
+    let theta_i = currentResult.insul.includes("XLPE") ? 90 : 70;
+    let theta_f = currentResult.insul.includes("XLPE") ? 250 : 160;
+    let t_sc = 1; 
+
+    let ln_val = Math.log((theta_f + beta) / (theta_i + beta));
+    let I_AD_single = (k_mat * phase_a / Math.sqrt(t_sc)) * Math.sqrt(ln_val);
+    let I_AD_total = I_AD_single * phase_n;
+    let is_Iad_pass = I_AD_total >= Ik3;
+    let iad_status = is_Iad_pass ? "<b style='color:#16A34A;'>ĐẠT</b>" : "<b style='color:#DC2626;'>KHÔNG ĐẠT</b>";
+
+
+    // ========================================================================
+    // TẠO HTML CÁC BẢNG TRA CHI TIẾT TRONG PHỤ LỤC (RENDER TỰ ĐỘNG)
+    // ========================================================================
+    let appendixTablesHTML = "";
+
+    // 1. BẢNG K1
+    let k1_obj = isAir ? k1_factors : k1_temperature_ground_factors;
+    let k1_temps = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
+    appendixTablesHTML += `
+    <h3 style="margin-top: 30px;">[Bảng 1] Hệ số suy giảm K1 do nhiệt độ môi trường ${isAir ? "(Không khí)" : "(Đất)"}</h3>
+    <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: center; margin-bottom: 20px;">
+        <tr style="background-color: #d1e7dd;">
+            <th style="border: 1px solid #000; padding: 6px;">Cách điện</th>`;
+    k1_temps.forEach(t => appendixTablesHTML += `<th style="border: 1px solid #000; padding: 6px;">${t}°C</th>`);
+    appendixTablesHTML += `</tr>`;
+    ["PVC", "XLPE/EPR"].forEach(ins => {
+        appendixTablesHTML += `<tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${ins}</td>`;
+        k1_temps.forEach(t => {
+            let val = k1_obj[ins][t] !== undefined ? k1_obj[ins][t].toFixed(2) : "-";
+            let isHighlight = (ins === currentResult.insul && t === envTemp);
+            let bg = isHighlight ? "background-color: #ffcccc; font-weight: bold; color: red;" : "";
+            appendixTablesHTML += `<td style="border: 1px solid #000; padding: 6px; ${bg}">${val}</td>`;
+        });
+        appendixTablesHTML += `</tr>`;
+    });
+    appendixTablesHTML += `</table>`;
+
+    // 2. BẢNG K2 & K3 (Nếu đi ngầm)
+    if (!isAir) {
+        appendixTablesHTML += `<div style="display: flex; gap: 20px;">
+            <div style="flex: 1;">
+                <h3>[Bảng 2] Hệ số K2 - Nhiệt trở suất của đất</h3>
+                <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: left; margin-bottom: 20px;">
+                    <tr style="background-color: #d1e7dd;">
+                        <th style="border: 1px solid #000; padding: 6px;">Loại đất</th>
+                        <th style="border: 1px solid #000; padding: 6px; text-align: center;">Hệ số K2</th>
+                    </tr>`;
+        Object.keys(k2_soil_thermal_factors).forEach(key => {
+            let val = k2_soil_thermal_factors[key].toFixed(2);
+            let isHighlight = (key === document.getElementById("soil_type").value);
+            let bg = isHighlight ? "background-color: #ffcccc; font-weight: bold; color: red;" : "";
+            appendixTablesHTML += `<tr><td style="border: 1px solid #000; padding: 6px;">${key}</td><td style="border: 1px solid #000; padding: 6px; text-align: center; ${bg}">${val}</td></tr>`;
+        });
+        appendixTablesHTML += `</table></div>
+            <div style="flex: 1;">
+                <h3>[Bảng 3] Hệ số K3 - Độ sâu chôn ngầm</h3>
+                <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: left; margin-bottom: 20px;">
+                    <tr style="background-color: #d1e7dd;">
+                        <th style="border: 1px solid #000; padding: 6px;">Độ sâu</th>
+                        <th style="border: 1px solid #000; padding: 6px; text-align: center;">Hệ số K3</th>
+                    </tr>`;
+        Object.keys(k3_depth_factors).forEach(key => {
+            let val = k3_depth_factors[key].toFixed(2);
+            let isHighlight = (key === document.getElementById("depth_type").value);
+            let bg = isHighlight ? "background-color: #ffcccc; font-weight: bold; color: red;" : "";
+            appendixTablesHTML += `<tr><td style="border: 1px solid #000; padding: 6px;">${key}</td><td style="border: 1px solid #000; padding: 6px; text-align: center; ${bg}">${val}</td></tr>`;
+        });
+        appendixTablesHTML += `</table></div></div>`;
+    }
+
+    // 3. BẢNG K4 (Gom nhóm mạch)
+    let k4_obj = isAir ? reduction_factors_air : k4_ground_grouping_factors;
+    appendixTablesHTML += `
+    <h3>[Bảng ${isAir ? "2" : "4"}] Hệ số K4 - Suy giảm do gom nhóm nhiều mạch (IEC 60364-5-52)</h3>
+    <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: center; margin-bottom: 20px;">
+        <tr style="background-color: #d1e7dd;">
+            <th style="border: 1px solid #000; padding: 6px; text-align: left;">Cách sắp xếp cáp (Arrangement)</th>
+            <th style="border: 1px solid #000; padding: 6px;">1 mạch</th>
+            <th style="border: 1px solid #000; padding: 6px;">2 mạch</th>
+            <th style="border: 1px solid #000; padding: 6px;">3 mạch</th>
+            <th style="border: 1px solid #000; padding: 6px;">4 mạch</th>
+            <th style="border: 1px solid #000; padding: 6px;">5 mạch</th>
+            <th style="border: 1px solid #000; padding: 6px;">6 mạch</th>
+            <th style="border: 1px solid #000; padding: 6px;">7 mạch</th>
+            <th style="border: 1px solid #000; padding: 6px;">8 mạch</th>
+            <th style="border: 1px solid #000; padding: 6px;">9 mạch</th>
+        </tr>`;
+    Object.keys(k4_obj).forEach(key => {
+        let row = k4_obj[key];
+        appendixTablesHTML += `<tr><td style="border: 1px solid #000; padding: 6px; text-align: left;">${key}</td>`;
+        for(let i=0; i<9; i++) {
+            let val = row[i] !== undefined ? row[i].toFixed(2) : "-";
+            let isHighlight = (key === groupMethod && i === (phase_n - 1));
+            let bg = isHighlight ? "background-color: #ffcccc; font-weight: bold; color: red;" : "";
+            appendixTablesHTML += `<td style="border: 1px solid #000; padding: 6px; ${bg}">${val}</td>`;
+        }
+        appendixTablesHTML += `</tr>`;
+    });
+    appendixTablesHTML += `</table>`;
+
+    // 4. BẢNG TRA CÁP (DỌC - GỘP R0, Rt, Iz theo cách xếp cáp)
+    let available_sizes = currentResult.cond === "Copper" ? Object.keys(res_cu) : Object.keys(res_al);
+    available_sizes.sort((a, b) => parseFloat(a) - parseFloat(b));
+    
+    // Tìm bảng gốc được dùng
+    let cable_table_ref = null;
+    let routing = currentResult.routing;
+    let cond = currentResult.cond;
+    if (routing === "Đi trên không/thang máng") {
+        cable_table_ref = cond === "Copper" ? cab_cu_air : cab_al_air;
+    } else if (routing.includes("trực tiếp")) {
+        cable_table_ref = cond === "Copper" ? cu_ground_direct : al_ground_direct;
+    } else {
+        cable_table_ref = cond === "Copper" ? cu_ground_pipe : al_ground_pipe;
+    }
+    
+    // Lấy tất cả phương thức xếp cáp (A,B,C,D...) hiện có
+    let all_methods = new Set();
+    Object.values(cable_table_ref).forEach(obj => Object.keys(obj).forEach(k => all_methods.add(k)));
+    let methods_arr = Array.from(all_methods).sort();
+
+    // TẠO TỪ ĐIỂN CHÚ THÍCH PHƯƠNG THỨC XẾP CÁP BẰNG TIẾNG VIỆT
+    let legend_dict = isAir ? {
+        "A": "<b>PP A:</b> 2 cáp đơn xếp tiếp xúc phẳng (Hệ 1 pha)",
+        "B": "<b>PP B:</b> 3 cáp đơn xếp tiếp xúc phẳng (Hệ 3 pha)",
+        "C": "<b>PP C:</b> 3 cáp đơn xếp hình 3 lá - Trefoil (Hệ 3 pha)",
+        "D": "<b>PP D:</b> 3 cáp đơn xếp cách khoảng trên mặt phẳng ngang (Hệ 3 pha)",
+        "E": "<b>PP E:</b> 3 cáp đơn xếp cách khoảng trên mặt phẳng đứng (Hệ 3 pha)",
+        "F": "<b>PP F:</b> Cáp nhiều lõi (Hệ 1 pha - 2 lõi mang điện)",
+        "G": "<b>PP G:</b> Cáp nhiều lõi (Hệ 3 pha - 3 lõi mang điện)"
+    } : {
+        "A": "<b>PP A:</b> Các cáp đơn xếp cách khoảng phẳng",
+        "B": "<b>PP B:</b> 3 cáp đơn xếp tiếp xúc hình 3 lá (Trefoil)",
+        "C": "<b>PP C:</b> Cáp nhiều lõi (Chung lớp bọc)",
+        "D": "<b>PP D:</b> Các cáp đơn xếp thành 1 bó (hoặc đi trong cùng 1 ống nhựa)"
+    };
+    
+    let legendHTML = `<div style="background-color: #f8f9fa; padding: 12px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 15px; font-size: 13.5px; line-height: 1.6;">
+        <div style="font-weight: bold; color: #0066CC; margin-bottom: 8px;">📋 Chú thích các Phương thức xếp cáp (PP) áp dụng cho môi trường hiện tại:</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">`;
+    methods_arr.forEach(m => {
+        legendHTML += `<div>${legend_dict[m] || `<b>PP ${m}:</b> Phương thức ${m}`}</div>`;
+    });
+    legendHTML += `</div></div>`;
+
+    appendixTablesHTML += `
+    <h3>[Bảng ${isAir ? "3" : "5"}] Thông số điện trở và Khả năng mang dòng định mức của Cáp ${currentResult.cond === 'Copper' ? 'Đồng (Cu)' : 'Nhôm (Al)'}</h3>
+    ${legendHTML}
+    <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: center; margin-bottom: 20px; table-layout: fixed;">
+        <tr style="background-color: #fce4e4; color: #d32f2f;">
+            <th rowspan="2" style="border: 1px solid #000; padding: 8px;">Tiết diện<br>danh nghĩa<br><i>(mm²)</i></th>
+            <th rowspan="2" style="border: 1px solid #000; padding: 8px;">Điện trở DC<br>tối đa ở 20°C (R<sub>0</sub>)<br><i>(Ω/km)</i></th>
+            <th rowspan="2" style="border: 1px solid #000; padding: 8px;">Điện trở AC<br>ở ${t_fixed}°C (R<sub>t</sub>)<br><i>(Ω/km)</i></th>
+            <th colspan="${methods_arr.length}" style="border: 1px solid #000; padding: 8px;">Khả năng mang dòng định mức I<sub>z</sub> (A) theo Phương thức xếp cáp</th>
+        </tr>
+        <tr style="background-color: #fce4e4; color: #d32f2f;">
+    `;
+    methods_arr.forEach(m => {
+        appendixTablesHTML += `<th style="border: 1px solid #000; padding: 6px;">PP ${m}</th>`;
+    });
+    appendixTablesHTML += `</tr>`;
+        
+    available_sizes.forEach(s => {
+        let s_float = parseFloat(s);
+        let r0_val = cond === "Copper" ? res_cu[s_float] : res_al[s_float];
+        let row_data = cable_table_ref[s_float];
+        
+        if (r0_val !== undefined && row_data !== undefined) {
+            let rt_val = r0_val * (1 + alpha * (t_fixed - 20));
+            let isHighlight = (s_float === phase_a);
+            
+            // CSS highlight nguyên hàng (viền đỏ)
+            let baseTdStyle = "padding: 7px;";
+            let highlightStyles = isHighlight ? "background-color: #ffcccc; font-weight: bold; color: red; border-top: 3px solid red; border-bottom: 3px solid red;" : "border: 1px solid #000;";
+            
+            let tdFirst = isHighlight ? baseTdStyle + highlightStyles + " border-left: 3px solid red; border-right: 1px solid red;" : baseTdStyle + highlightStyles;
+            let tdMid = isHighlight ? baseTdStyle + highlightStyles + " border-left: 1px solid red; border-right: 1px solid red;" : baseTdStyle + highlightStyles;
+            let tdLast = isHighlight ? baseTdStyle + highlightStyles + " border-right: 3px solid red; border-left: 1px solid red;" : baseTdStyle + highlightStyles;
+
+            appendixTablesHTML += `<tr>
+                <td style="${tdFirst}">${s}</td>
+                <td style="${tdMid}">${r0_val}</td>
+                <td style="${tdMid}">${rt_val.toFixed(4)}</td>`;
+                
+            methods_arr.forEach((m, index) => {
+                let iz_val = row_data[m] !== undefined ? row_data[m] : "-";
+                
+                let cellStyle = tdMid;
+                if (index === methods_arr.length - 1) cellStyle = tdLast;
+                
+                // Highlight ĐẶC BIỆT ô phương thức xếp cáp được chọn
+                if (isHighlight && (m === currentResult.methodKey)) {
+                    cellStyle += " background-color: #dc2626; color: white;"; 
+                }
+                
+                appendixTablesHTML += `<td style="${cellStyle}">${iz_val}</td>`;
+            });
+            appendixTablesHTML += `</tr>`;
+        }
+    });
+    appendixTablesHTML += `</table>`;
+
+
+    // Khởi tạo nội dung văn bản HTML tổng
     let htmlContent = `
     <!DOCTYPE html>
     <html lang="vi">
@@ -1079,6 +1002,7 @@ function exportExplanation() {
             body { font-family: 'Times New Roman', Times, serif; line-height: 1.5; color: #000; padding: 40px; max-width: 800px; margin: 0 auto; }
             h1 { text-align: center; font-size: 20px; text-transform: uppercase; margin-bottom: 30px;}
             h2 { font-size: 16px; border-bottom: 1px solid #000; padding-bottom: 5px; margin-top: 30px; text-transform: uppercase;}
+            h3 { font-size: 15px; margin-top: 20px; text-decoration: underline; }
             p { font-size: 15px; margin: 10px 0; text-align: justify; }
             ul { font-size: 15px; line-height: 1.6; }
             li { margin-bottom: 8px; text-align: justify; }
@@ -1098,68 +1022,167 @@ function exportExplanation() {
 
         <h1>THUYẾT MINH TÍNH TOÁN KỸ THUẬT<br>LỰA CHỌN TIẾT DIỆN CÁP VÀ THIẾT BỊ ĐÓNG CẮT</h1>
 
-        <h2>1. Cơ sở tính toán dòng điện phụ tải (I<sub>tt</sub>)</h2>
-        <p>Hệ thống điện được khai báo là <b>${sys}</b> với cấp điện áp định mức U = ${U}V. Giá trị công suất/dòng điện đầu vào khai báo là: <b>${currentResult.loadStr}</b>.</p>
-        <p>Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán liên tục (I<sub>tt</sub>) được xác định theo công thức:</p>
-        <div class="formula">I<sub>tt</sub> = ${is3Phase ? "S / (√3 × U)" : "S / U"} (hoặc tính từ P thông qua hệ số cosφ)</div>
-        <p>Thay số thực tế vào hệ thống, ta có dòng tính toán làm cơ sở thiết kế: <b>I<sub>tt</sub> = ${currentResult.Itt_cb} A</b>.</p>
+        <h2>1. Tiêu chuẩn và Tài liệu áp dụng</h2>
+        <ul>
+            <li><b>TCVN 7447-5-52 (IEC 60364-5-52):</b> Hệ thống lắp đặt điện hạ áp - Phần 5-52: Lựa chọn và lắp đặt thiết bị điện - Hệ thống đi dây (Sử dụng để xác định khả năng mang dòng và các hệ số hiệu chỉnh K).</li>
+            <li><b>TCVN 5939 (IEC 60228):</b> Ruột dẫn của cáp điện cách điện bằng điện môi rắn (Dùng để xác định thông số điện trở một chiều R<sub>0</sub> của cáp đồng/nhôm).</li>
+            <li><b>IEC 60949:</b> Tính toán dòng điện ngắn mạch cho phép về phương diện nhiệt độ (Dùng để kiểm tra sức chịu đựng giới hạn của cáp khi có sự cố).</li>
+            <li><b>Tài liệu hãng (Schneider Cahier Technique 158):</b> Tính toán dòng điện ngắn mạch (Áp dụng phương pháp tổng trở quy đổi).</li>
+        </ul>
 
-        <h2>2. Xác định hệ số hiệu chỉnh môi trường lắp đặt (K)</h2>
-        <p>Điều kiện lắp đặt khai báo là <b>${currentResult.routing}</b> (mã phương thức ${currentResult.methodDisplay} theo tiêu chuẩn TCVN 7447-5-52 / IEC 60364-5-52). Do các yếu tố môi trường và cách sắp xếp cáp, khả năng tản nhiệt bị suy giảm, hệ số hiệu chỉnh K tổng cộng được áp dụng:</p>
+        <h2>2. Tổng hợp thông số đầu vào</h2>
+        <ul>
+            <li><b>Hệ thống điện:</b> ${sys}, cấp điện áp U = ${U}V</li>
+            <li><b>Công suất Trạm biến áp nguồn (S<sub>ba</sub>):</b> ${s_ba} kVA</li>
+            <li><b>Điện áp ngắn mạch (U<sub>k</sub>):</b> ${u_k}%</li>
+            <li><b>Thông số tải phụ tải:</b> ${loadStr}</li>
+            <li><b>Chiều dài tuyến cáp (L):</b> ${L} m</li>
+            <li><b>Độ sụt áp tối đa cho phép:</b> ${currentResult.dU_limit}%</li>
+            <li><b>Cấu hình cáp:</b> Vật liệu dẫn ${currentResult.cond === 'Copper' ? 'Đồng (Cu)' : 'Nhôm (Al)'}, cách điện ${currentResult.insul}</li>
+            <li><b>Phương thức lắp đặt:</b> ${currentResult.routing} (Mã phương thức: ${currentResult.methodDisplay})</li>
+        </ul>
+
+        <h2>3. Cơ sở tính toán dòng điện phụ tải (I<sub>tt</sub>)</h2>
+        <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán liên tục (I<sub>tt</sub>) làm cơ sở thiết kế được xác định theo công thức:</p>
+        <div class="formula">${formulaHTML}</div>
+        <p>Thực hiện thay số vào hệ thống, ta có kết quả dòng tính toán: <b>I<sub>tt</sub> = ${currentResult.Itt_cb} A</b>.</p>
+
+        <h2>4. Xác định hệ số hiệu chỉnh môi trường lắp đặt (K)</h2>
+        <p>Dựa trên điều kiện lắp đặt khai báo và mã phương thức theo tiêu chuẩn TCVN 7447-5-52 (hoặc IEC 60364-5-52), khả năng tản nhiệt của cáp bị suy giảm. Hệ số hiệu chỉnh K tổng cộng được xác định qua công thức:</p>
         <div class="formula">K = K<sub>1</sub> × K<sub>2</sub> × K<sub>3</sub> × K<sub>4</sub></div>
         <ul>
-            <li>Hệ số suy giảm do nhiệt độ môi trường (K<sub>1</sub>): <b>${currentResult.temp_factor}</b></li>
-            <li>Hệ số nhiệt trở suất của đất (K<sub>2</sub>): <b>${currentResult.soil_factor}</b></li>
-            <li>Hệ số độ sâu chôn cáp (K<sub>3</sub>): <b>${currentResult.depth_factor}</b></li>
-            <li>Hệ số ảnh hưởng do gom nhóm mạch/cáp (K<sub>4</sub>): <b>${currentResult.touch_factor}</b></li>
+            <li>Hệ số suy giảm do nhiệt độ môi trường (K<sub>1</sub>): <b>${currentResult.temp_factor}</b> <span style="color:#2563EB;"><i>(Tra tại Bảng 1 Phụ lục)</i></span></li>
+            <li>Hệ số nhiệt trở suất của đất (K<sub>2</sub>): ${k2_text}</li>
+            <li>Hệ số độ sâu chôn cáp (K<sub>3</sub>): ${k3_text}</li>
+            <li>Hệ số ảnh hưởng do gom nhóm mạch/cáp (K<sub>4</sub>): <b>${currentResult.touch_factor}</b> <span style="color:#2563EB;"><i>(Tra tại Bảng ${isAir ? "2" : "4"} Phụ lục)</i></span></li>
         </ul>
-        <p>Tổng hệ số hiệu chỉnh áp dụng cho việc chọn cáp: <b>K = ${currentResult.overall_K}</b>.</p>
+        <p>Tổng hệ số hiệu chỉnh áp dụng cho việc chọn cáp là: <b>K = ${currentResult.overall_K}</b>.</p>
 
-        <h2>3. Tính toán và Lựa chọn tiết diện cáp</h2>
+        <h2>5. Tính toán và Lựa chọn tiết diện cáp</h2>
         <p>Điều kiện bắt buộc: Khả năng mang dòng liên tục thực tế của hệ thống cáp (I<sub>z_total</sub>) sau khi đã hiệu chỉnh phải lớn hơn hoặc bằng dòng điện phụ tải (I<sub>tt</sub>):</p>
         <div class="formula">I<sub>z_total</sub> = (I<sub>z_bảng_tra</sub> × K) × số_sợi_song_song ≥ I<sub>tt</sub></div>
         <div class="highlight">
-            Căn cứ vòng lặp đối chiếu thuật toán với catalogue cáp <b>${currentResult.cond}</b> cách điện <b>${currentResult.insul}</b>, hệ thống đã đề xuất cấu hình: <b>${currentResult.phase_cable} mm²</b>.<br><br>
-            • Dòng định mức tra bảng của 1 mạch: ${currentResult.Iz_single / currentResult.overall_K} A.<br>
-            • Khả năng mang dòng thực tế của 1 mạch (sau hiệu chỉnh): I<sub>z</sub> = ${currentResult.Iz_single} A.<br>
+            Căn cứ vòng lặp đối chiếu thuật toán với catalogue cáp cách điện <b>${currentResult.insul}</b>, hệ thống đã đề xuất cấu hình: <b>${currentResult.phase_cable} mm²</b>.<br><br>
+            • Dòng định mức tra bảng của 1 mạch: <b>${(parseFloat(currentResult.Iz_single) / parseFloat(currentResult.overall_K)).toFixed(2)} A</b>. <span style="color:#2563EB;"><i>(Tra tại Bảng ${isAir ? "3" : "5"} Phụ lục)</i></span><br>
+            • Khả năng mang dòng thực tế của 1 mạch (sau hiệu chỉnh K): I<sub>z</sub> = ${currentResult.Iz_single} A.<br>
             • Tổng khả năng mang dòng của thiết kế: <b>I<sub>z_total</sub> = ${currentResult.Iz_total} A</b>.
         </div>
         <p>Vì <b>${currentResult.Iz_total} A ≥ ${currentResult.Itt_cb} A</b>, cấu hình cáp này hoàn toàn đạt yêu cầu về khả năng mang tải nhiệt liên tục.</p>
 
-        <h2>4. Kiểm tra điều kiện sụt áp (ΔU)</h2>
+        <h2>6. Kiểm tra điều kiện sụt áp (ΔU)</h2>
         <p>Tiết diện cáp được kiểm tra chéo với điều kiện sụt áp, đảm bảo phần trăm sụt áp tại cuối đường dây không vượt quá mức cho phép (${currentResult.dU_limit}%).</p>
         <div class="formula">ΔU = ${is3Phase ? "√3" : "2"} × I<sub>tt</sub> × L × (R<sub>t</sub> × cosφ + X × sinφ) / (1000 × n)</div>
-        <p>Trong đó, điện trở phần ứng của cáp ở nhiệt độ làm việc cực đại định mức (${currentResult.t_fixed}°C) là R<sub>t</sub> = ${currentResult.rt_val} Ω/km. Chiều dài tuyến cáp L = ${currentResult.length} m.</p>
-        <p><b>Kết quả kiểm tra:</b></p>
+        
+        <p>Trong đó, <b>R<sub>t</sub></b> là điện trở phần ứng của cáp ở nhiệt độ làm việc cực đại định mức (${t_fixed}°C), được tính toán quy đổi từ giá trị điện trở một chiều (DC) chuẩn ở 20°C (R<sub>0</sub>) theo công thức:</p>
+        <div class="formula">R<sub>t</sub> = R<sub>0</sub> × [1 + α × (θ<sub>f</sub> - 20)]</div>
+        <ul>
+            <li><b>R<sub>0</sub></b>: Điện trở của lõi ${currentResult.cond === 'Copper' ? 'Đồng (Cu)' : 'Nhôm (Al)'} tiết diện ${phase_a} mm² tại 20°C = <b>${R0_phase} Ω/km</b> <span style="color:#2563EB;"><i>(Tra tại Bảng ${isAir ? "3" : "5"} Phụ lục)</i></span>.</li>
+            <li><b>α</b>: Hệ số nhiệt điện trở của ${currentResult.cond === 'Copper' ? 'Đồng (Cu) là 0.00393' : 'Nhôm (Al) là 0.00403'} K<sup>-1</sup>.</li>
+            <li><b>θ<sub>f</sub></b>: Nhiệt độ cực đại của cách điện ${currentResult.insul} = ${t_fixed}°C.</li>
+        </ul>
+        <p>➔ Thay số ta được: <b>R<sub>t</sub> = ${currentResult.rt_val} Ω/km</b>.</p>
+        
+        <p><b>Kết quả kiểm tra sụt áp đường dây:</b></p>
         <ul>
             <li>Độ sụt áp tuyệt đối: <b>ΔU = ${currentResult.dU_val} V</b></li>
             <li>Tỷ lệ sụt áp tương đối: <b>%ΔU = ${currentResult.dU_percent}% ≤ ${currentResult.dU_limit}%</b> (Đạt điều kiện)</li>
         </ul>
 
-        <h2>5. Tính toán dòng ngắn mạch điểm chạm (I<sub>sc</sub>) và Các giả thiết kỹ thuật</h2>
-        <p>Dòng ngắn mạch được tính toán theo phương pháp trở kháng (Impedance Method). Tính toán dựa trên việc quy đổi tổng trở từ trạm biến áp nguồn (Z<sub>ba</sub>) và tổng trở của đường dây cáp tương đương (Z<sub>cable</sub>) về điểm xảy ra sự cố.</p>
-        <div class="formula">I<sub>k3</sub> = U / (√3 × ΣZ)</div>
-        <p>Kết quả tính toán cường độ dòng điện ngắn mạch chạm chập 3 pha cực đại tại điểm cuối tuyến cáp là: <b>I<sub>k3</sub> = ${currentResult.Ik3_str}</b>. Thông số này dùng làm cơ sở để chọn năng lực cắt của thiết bị đóng cắt.</p>
+        <h2>7. Tính toán dòng ngắn mạch điểm chạm (I<sub>sc</sub>)</h2>
+        <p>Dòng ngắn mạch được tính toán theo phương pháp trở kháng (Impedance Method). Tính toán dựa trên việc quy đổi tổng trở từ trạm biến áp nguồn (Z<sub>ba</sub>) và tổng trở của đường dây cáp tương đương (Z<sub>cable</sub>) về điểm xảy ra sự cố (điểm cuối tuyến cáp).</p>
         
-        <p><b>Các cơ sở kỹ thuật và giả thiết đơn giản hóa áp dụng trong thuật toán phần mềm:</b></p>
+        <h3>7.1. Xác định các thành phần trở kháng (Quy đổi về đơn vị mΩ)</h3>
+        <p><b>a) Trở kháng của Trạm biến áp nguồn:</b></p>
+        <div class="formula">Z<sub>ba</sub> = (U<sub>k</sub>% / 100) × (U<sup>2</sup> / S<sub>ba</sub>) = (${u_k}% / 100) × (${U}<sup>2</sup> / ${s_ba * 1000}) = ${(Zba*1000).toFixed(2)} mΩ</div>
+        <ul>
+            <li>Điện trở máy biến áp: R<sub>ba</sub> ≈ 0.2 × Z<sub>ba</sub> = ${(Rba*1000).toFixed(2)} mΩ</li>
+            <li>Điện kháng máy biến áp: X<sub>ba</sub> = √(Z<sub>ba</sub><sup>2</sup> - R<sub>ba</sub><sup>2</sup>) = ${(Xba*1000).toFixed(2)} mΩ</li>
+        </ul>
+
+        <p><b>b) Trở kháng của tuyến cáp dẫn:</b></p>
+        <p>Được tính theo chiều dài L = ${L} m, với số sợi song song n<sub>pha</sub> = ${phase_n} và n<sub>trung_tính</sub> = ${neut_n}.</p>
+        <ul>
+            <li>Điện trở cáp pha: R<sub>p</sub> = (R<sub>0_pha</sub> × L) / (1000 × n) = ${(Rp*1000).toFixed(2)} mΩ</li>
+            <li>Điện kháng cáp pha: X<sub>p</sub> = (X<sub>0</sub> × L) / (1000 × n) = ${(Xp*1000).toFixed(2)} mΩ <i>(Mặc định X<sub>0</sub> = 0.08 Ω/km)</i></li>
+            <li>Điện trở cáp trung tính: R<sub>n</sub> = (R<sub>0_N</sub> × L) / (1000 × n<sub>N</sub>) = ${(Rn*1000).toFixed(2)} mΩ</li>
+            <li>Điện kháng cáp trung tính: X<sub>n</sub> = (X<sub>0</sub> × L) / (1000 × n<sub>N</sub>) = ${(Xn*1000).toFixed(2)} mΩ</li>
+        </ul>
+
+        <p><b>c) Tổng trở mạch vòng sự cố:</b></p>
+        <ul>
+            <li>Tổng trở sự cố 3 pha: Z<sub>3</sub> = √[(R<sub>ba</sub> + R<sub>p</sub>)<sup>2</sup> + (X<sub>ba</sub> + X<sub>p</sub>)<sup>2</sup>] = ${(Z3*1000).toFixed(2)} mΩ</li>
+            <li>Tổng trở sự cố 1 pha: Z<sub>1</sub> = √[(R<sub>ba</sub> + R<sub>p</sub> + R<sub>n</sub>)<sup>2</sup> + (X<sub>ba</sub> + X<sub>p</sub> + X<sub>n</sub>)<sup>2</sup>] = ${(Z1*1000).toFixed(2)} mΩ</li>
+        </ul>
+
+        <h3>7.2. Kết quả tính toán các trường hợp ngắn mạch</h3>
+        <ul>
+            ${is3Phase ? `
+            <li><b>Dòng ngắn mạch chạm chập 3 pha cực đại:</b><br>
+            <div class="formula">I<sub>k3</sub> = U / (√3 × Z<sub>3</sub>) = ${currentResult.Ik3_str}</div></li>
+            
+            <li><b>Dòng ngắn mạch chạm chập 2 pha:</b><br>
+            <div class="formula">I<sub>k2</sub> = (U / 2) / Z<sub>3</sub> = ${currentResult.Ik2_str}</div></li>
+            ` : ''}
+
+            <li><b>Dòng ngắn mạch chạm chập 1 pha (Pha chạm Trung tính/Đất):</b><br>
+            <div class="formula">I<sub>k1</sub> = U<sub>pha</sub> / Z<sub>1</sub> = ${currentResult.Ik1_str}</div></li>
+        </ul>
+
+        <h3>7.3. Các giả thiết kỹ thuật áp dụng</h3>
         <ul>
             <li><b>Bỏ qua tổng trở lưới điện phía thượng nguồn (Z<sub>up</sub>):</b> Trong thực tế công thức gốc là I<sub>sc</sub> = U / [√3 × (Z<sub>up</sub> + Z<sub>T</sub>)]. Tuy nhiên, khi công suất ngắn mạch nguồn thượng nguồn (S<sub>sc</sub>) lớn hơn rất nhiều so với công suất định mức trạm biến áp hạ thế (S<sub>n</sub>), phần mềm xem lưới điện thượng nguồn là lưới vô hạn (Z<sub>up</sub> = 0). Đây là phương pháp thực hành phổ biến khi thiết kế tủ điện hạ thế nhỏ và vừa, cho kết quả tính toán nhanh chóng, thiên về an toàn với sai số tăng thêm chỉ khoảng 5%.</li>
             <li><b>Bỏ qua đóng góp dòng ngắn mạch của động cơ không đồng bộ:</b> Khi xảy ra sự cố, các động cơ lớn đang vận hành có khả năng phát ngược dòng ngắn mạch vào lưới (khoảng 4.8 × I<sub>n_động_cơ</sub>) trong vài chu kỳ đầu. Do ứng dụng tính toán dựa trên mô hình phụ tải tổng quát và không yêu cầu người dùng khai báo tỷ lệ tải động cơ chi tiết, thành phần này được đơn giản hóa lược bỏ.</li>
             <li><b>Bỏ qua điện trở của thiết bị đóng cắt (Switchgear impedance):</b> Thực tế cần cộng thêm khoảng 0.15 mΩ điện trở tiếp xúc cho mỗi CB bảo vệ trên tuyến dây. Tuy nhiên ở lưới hạ thế, giá trị trở kháng này rất nhỏ, sai số gây ra không đáng kể nên phần mềm được cấu hình bỏ qua để tối ưu hóa bài toán tính toán trở kháng.</li>
-            <li><b>Nhiệt độ tính toán điện trở cáp (R<sub>p</sub>):</b> Đối với bài toán tính dòng ngắn mạch kiểm tra điều kiện cắt của CB, giá trị cốt lõi cần tìm là dòng ngắn mạch lớn nhất có thể xảy ra nhằm lựa chọn dòng cắt tới hạn (I<sub>cu</sub>) an toàn. Do đó, điện trở cáp được thuật toán gọi trực tiếp từ bảng tra thông số kỹ thuật gốc ở nhiệt độ tiêu chuẩn 20°C (r_phys) thay vì nhiệt độ hoạt động cực đại (như khi tính ngắn mạch cực tiểu). Cách làm này đảm bảo tính ra được <b>Dòng ngắn mạch cực đại (Maximum short-circuit current)</b> chính xác nhất phục vụ việc phối hợp thiết bị an toàn.</li>
+            <li><b>Nhiệt độ tính toán điện trở cáp (R<sub>p</sub>):</b> Đối với bài toán tính dòng ngắn mạch kiểm tra điều kiện cắt của CB, giá trị cốt lõi cần tìm là dòng ngắn mạch lớn nhất có thể xảy ra nhằm lựa chọn dòng cắt tới hạn (I<sub>cu</sub>) an toàn. Do đó, điện trở cáp được thuật toán gọi trực tiếp từ bảng tra thông số kỹ thuật gốc ở nhiệt độ tiêu chuẩn 20°C (R<sub>0</sub>) thay vì nhiệt độ hoạt động cực đại (như khi tính ngắn mạch cực tiểu). Cách làm này đảm bảo tính ra được <b>Dòng ngắn mạch cực đại (Maximum short-circuit current)</b> chính xác nhất.</li>
         </ul>
 
-        <h2>6. Chọn lựa thiết bị đóng cắt bảo vệ (CB)</h2>
+        <h2>8. Chọn lựa thiết bị đóng cắt bảo vệ (CB)</h2>
         <p>Căn cứ theo tiêu chuẩn thiết kế lắp đặt điện, CB bảo vệ cáp phải thỏa mãn đồng thời hai điều kiện vật lý cốt lõi:</p>
         <ul>
             <li><b>Điều kiện bảo vệ quá tải:</b> I<sub>tt</sub> ≤ I<sub>n</sub> (hoặc I<sub>r</sub> chỉnh định) ≤ I<sub>z_total</sub></li>
-            <li><b>Điều kiện cắt ngắn mạch:</b> I<sub>cu</sub> (Khả năng cắt ngắn mạch tới hạn) ≥ I<sub>k3</sub></li>
+            <li><b>Điều kiện cắt ngắn mạch:</b> I<sub>cu</sub> (Khả năng cắt ngắn mạch tới hạn) ≥ I<sub>k3</sub> (hoặc I<sub>k1</sub> đối với lưới 1 pha)</li>
         </ul>
         <div class="highlight">
             <b>CẤU HÌNH CB ĐỀ XUẤT:</b><br><br>
             • Chọn dòng định mức (I<sub>n</sub>) là: <b>${currentResult.cb_In} A</b> (Phù hợp vì ${currentResult.Itt_cb} A ≤ ${currentResult.cb_In} A ≤ ${currentResult.Iz_total} A).<br>
-            • Chọn khả năng cắt ngắn mạch tối thiểu (I<sub>cu</sub>) là: <b>${currentResult.cb_Icu} kA</b> (Đảm bảo cắt an toàn dòng sự cố ${currentResult.Ik3_str}).
+            • Chọn khả năng cắt ngắn mạch tối thiểu (I<sub>cu</sub>) là: <b>${currentResult.cb_Icu} kA</b>.
         </div>
+
+        <h2>9. Kiểm tra khả năng chịu dòng ngắn mạch của cáp (Theo IEC 60949)</h2>
+        <p>Mục đích nhằm kiểm tra khả năng chịu dòng sự cố I<sub>AD</sub> của dây dẫn đề xuất. Thời gian chịu dòng ngắn mạch tính toán được <b>chọn t = 1s</b> (có tính dự phòng an toàn cao, do thực tế các thiết bị đóng cắt ACB/MCCB ngắt sự cố ở dòng cắt định mức chỉ trong khoảng 0.05 - 0.1s).</p>
+        <div class="formula">
+            I<sub>AD</sub> = (K × S / √t) × √[ ln((θ<sub>f</sub> + β) / (θ<sub>i</sub> + β)) ]
+        </div>
+        <p>Trong đó:</p>
+        <ul>
+            <li>K = ${k_mat}, β = ${beta} (Hệ số đối với vật liệu dẫn ${currentResult.cond === "Copper" ? "Đồng Cu" : "Nhôm Al"}).</li>
+            <li>S = ${phase_a} mm² (Tiết diện của 1 sợi cáp).</li>
+            <li>t = ${t_sc} s (Thời gian chịu dòng ngắn mạch).</li>
+            <li>θ<sub>i</sub> = ${theta_i}°C (Nhiệt độ hoạt động ban đầu trước khi ngắn mạch của cách điện ${currentResult.insul}).</li>
+            <li>θ<sub>f</sub> = ${theta_f}°C (Nhiệt độ giới hạn cuối cùng tại điểm ngắn mạch của cách điện ${currentResult.insul}).</li>
+        </ul>
+        
+        <p>➔ Dòng ngắn mạch cho phép đối với <b>1 sợi ${phase_a} mm²</b> là:</p>
+        <div class="formula">
+            I<sub>AD(1 sợi)</sub> = (${k_mat} × ${phase_a} / √1) × √[ ln((${theta_f} + ${beta}) / (${theta_i} + ${beta})) ] = ${Math.round(I_AD_single)} A
+        </div>
+        
+        <p>➔ Vậy với <b>${phase_n} sợi cáp ${phase_a} mm²</b> (cùng loại, cùng đặc tính kỹ thuật) đi song song, dòng điện sự cố nhiệt ngắn mạch chịu đựng được trong 1s là:</p>
+        <div class="highlight">
+            I<sub>AD(tổng)</sub> = ${Math.round(I_AD_single)} × ${phase_n} = <b>${Math.round(I_AD_total)} A</b> (= ${(I_AD_total/1000).toFixed(2)} kA)
+        </div>
+        
+        <p><b>KẾT LUẬN:</b> So sánh với dòng ngắn mạch lớn nhất chạy qua cáp I<sub>k3</sub> = ${currentResult.Ik3_str}, ta thấy <b>I<sub>AD(tổng)</sub> = ${Math.round(I_AD_total)} A ≥ I<sub>k3</sub></b>. Khả năng chịu đựng sự cố nhiệt ngắn mạch của hệ thống cáp: ${iad_status}.</p>
+        <p><i>(Thực tế, dòng ngắn mạch cho phép của cáp tính theo IEC 60949 tỉ lệ nghịch với thời gian sự cố mà dây cáp phải chịu. Thời gian thiết bị đóng cắt ngắt mạch càng nhỏ thì khả năng chịu dòng sự cố của dây cáp sẽ càng lớn).</i></p>
+
+        <h2 style="text-align: center; margin-top: 50px; font-size: 18px;">PHỤ LỤC: BẢNG DỮ LIỆU TRA CỨU TIÊU CHUẨN</h2>
+        <p style="text-align: center; font-style: italic; margin-bottom: 20px;">
+            (Các bảng dưới đây được trích xuất từ dữ liệu lõi của phần mềm.<br>
+            <b style="color:red; background-color:#ffcccc; padding:2px 5px;">Khung viền ĐỎ</b> là thông số được thuật toán tự động nhận diện dựa trên cấu hình khai báo hiện tại)
+        </p>
+        
+        ${appendixTablesHTML}
+        
         <br><br><br>
         <p style="text-align: right; font-style: italic;">---- Hết tài liệu thuyết minh ----</p>
     </body>
