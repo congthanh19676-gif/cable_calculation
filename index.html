@@ -705,129 +705,325 @@ function getWatermarkImage(imageUrl) {
     });
 }
 	// ============================================================================
-// HÀM XUẤT BÁO CÁO PDF (BẢN TÓM TẮT DỰ ÁN)
 // ============================================================================
-function generatePDF() {
-    if(!currentResult) {
-        alert("Vui lòng chạy tính toán trước khi xuất báo cáo!");
-        return;
-    }
+// XUẤT PDF TRỰC TIẾP TỪ DỮ LIỆU SỬ DỤNG jsPDF & jsPDF-AutoTable (Native PDF)
+// ============================================================================
+async function generatePDF() {
+    if(!currentResult) return;
+    
+    let btnConfirm = document.getElementById("btn_confirm_pdf");
+    let originalText = btnConfirm.innerHTML;
+    btnConfirm.innerHTML = "⏳ ĐANG XUẤT PDF TRỰC TIẾP...";
+    btnConfirm.disabled = true;
 
-    // Đổi trạng thái nút bấm để tránh click nhiều lần
-    let btn = document.getElementById("btn_confirm_pdf");
-    let originalText = btn.innerHTML;
-    btn.innerHTML = "⏳ ĐANG TẠO FILE PDF...";
-    btn.disabled = true;
+    // Lấy thông tin
+    let engineerName = document.getElementById("pdf_engineer").value;
+    let projName = document.getElementById("pdf_project").value;
+    let companyName = document.getElementById("pdf_company").value;
+    let custName = document.getElementById("pdf_customer").value;
+    let feedName = document.getElementById("pdf_feeder").value;
+
+    let firstName = engineerName.split(' ')[0];
+    let lastName = engineerName.split(' ').slice(1).join(' ') || engineerName;
+
+    let now = new Date();
+    let timestamp = ("0" + now.getDate()).slice(-2) + "/" + ("0" + (now.getMonth() + 1)).slice(-2) + "/" + now.getFullYear() + " " + 
+                    now.toLocaleTimeString('en-US', {hour12: true, hour: '2-digit', minute:'2-digit', second:'2-digit'});
 
     try {
-        // Khởi tạo jsPDF
+        // --- 1. TẢI ẢNH WATERMARK TRƯỚC KHI TẠO PDF ---
+        let watermark = null;
+        try {
+            // Tải ảnh từ thư mục images. 
+            watermark = await getWatermarkImage('images/VAS.png');
+        } catch (imgErr) {
+            console.warn("Lưu ý: Không thể tải ảnh watermark (Có thể do chạy file .html offline hoặc sai đường dẫn). Hệ thống vẫn tiếp tục xuất PDF.", imgErr);
+        }
+
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
+		const doc = new jsPDF({
+    		encryption: {
+        		ownerPassword: "VAS-Report-Secure-Key", // Bạn có thể đặt một mật khẩu phức tạp của riêng bạn
+        		userPermissions: ["print", "copy"] // Chỉ cấp quyền in ấn và bôi đen copy chữ. Không khai báo "modify".
+    		}
+		});
 
-        // Lấy thông tin dự án từ popup
-        let prj = document.getElementById("pdf_project").value || "N/A";
-        let fdr = document.getElementById("pdf_feeder").value || "N/A";
-        let eng = document.getElementById("pdf_engineer").value || "N/A";
-        let cus = document.getElementById("pdf_customer").value || "N/A";
-        let com = document.getElementById("pdf_company").value || "N/A";
+        // 2. Tải và thiết lập Font tiếng Việt (Roboto)
+        const robotoRegular = await fetchFontBase64('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf');
+        const robotoMedium = await fetchFontBase64('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Medium.ttf');
 
-        // Ghi chú quan trọng: Trình duyệt mặc định của jsPDF không hỗ trợ Tiếng Việt có dấu (sẽ bị lỗi font thành dấu ?).
-        // Do đó, template báo cáo dưới đây được tối ưu hóa hiển thị bằng Tiếng Anh chuẩn kỹ thuật.
-
-        // HEADER
-        doc.setFontSize(18);
-        doc.setTextColor(0, 102, 204);
-        doc.text("CABLE SIZING & CB SELECTION REPORT", 105, 20, { align: "center" });
+        doc.addFileToVFS("Roboto-Regular.ttf", robotoRegular);
+        doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
         
+        doc.addFileToVFS("Roboto-Medium.ttf", robotoMedium);
+        doc.addFont("Roboto-Medium.ttf", "Roboto", "bold");
+        
+        doc.setFont("Roboto", "normal"); 
+
+        let startY = 35;
+        
+        // ================= VẼ Ô NOTICE =================
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.8);
+        doc.rect(14, startY, 182, 45, 'D'); 
+        
+        doc.setFillColor(0, 102, 255); 
+        doc.rect(14.4, startY + 0.4, 181.2, 7, 'F'); 
+        
+        doc.setFont("Roboto", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.text("NOTICE", 105, startY + 5.2, { align: "center", fontStyle: 'italic' });
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(11);
+        doc.text("RISK OF INACCURATE DATA RESULTS", 18, startY + 14);
+        
+        doc.setFont("Roboto", "normal");
         doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text("VAS Engineering System", 105, 26, { align: "center" });
-
-        // SECTION 1: PROJECT INFORMATION
-        doc.autoTable({
-            startY: 35,
-            head: [['Project Information', '']],
-            body: [
-                ['Project Name', prj],
-                ['Feeder Name', fdr],
-                ['Company', com],
-                ['Customer', cus],
-                ['Design Engineer', eng],
-            ],
-            theme: 'grid',
-            headStyles: { fillColor: [2, 132, 199], fontSize: 11 },
-            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
-        });
-
-        // SECTION 2: SYSTEM & LOAD PARAMETERS
-        doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 10,
-            head: [['1. System & Load Parameters', '']],
-            body: [
-                ['System Type', currentResult.sysType],
-                ['Input Load', currentResult.loadStr],
-                ['Design Current (Base)', currentResult.Itt_cb + ' A'],
-                ['Cable Length', currentResult.length + ' m'],
-                ['Allowed Voltage Drop', currentResult.dU_limit + ' %'],
-            ],
-            theme: 'grid',
-            headStyles: { fillColor: [71, 85, 105], fontSize: 11 },
-            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
-        });
-
-        // SECTION 3: CABLE SELECTION RESULT
-        doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 10,
-            head: [['2. Cable Selection Result', '']],
-            body: [
-                ['Conductor & Insulation', currentResult.cond + ' / ' + currentResult.insul],
-                ['Installation Method', currentResult.methodDisplay],
-                ['Overall Derating Factor (K)', currentResult.overall_K],
-                ['Phase Cable Size', currentResult.phase_cable + ' mm2'],
-                ['Neutral Cable Size', currentResult.n_cable + ' mm2'],
-                ['Total Ampacity (Iz)', currentResult.Iz_total + ' A'],
-            ],
-            theme: 'grid',
-            headStyles: { fillColor: [22, 163, 74], fontSize: 11 },
-            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
-        });
-
-        // SECTION 4: SHORT CIRCUIT & PROTECTION
-        doc.autoTable({
-            startY: doc.lastAutoTable.finalY + 10,
-            head: [['3. Protection & Verification', '']],
-            body: [
-                ['Voltage Drop (Actual)', currentResult.dU_percent + ' %  (' + currentResult.dU_val + ' V)'],
-                ['Max Short Circuit (Ik3)', currentResult.Ik3_str],
-                ['Min Short Circuit (Ik1)', currentResult.Ik1_str],
-                ['Proposed Circuit Breaker (In)', currentResult.cb_In + ' A'],
-                ['Required Breaking Cap. (Icu)', currentResult.cb_Icu + ' kA'],
-            ],
-            theme: 'grid',
-            headStyles: { fillColor: [220, 38, 38], fontSize: 11 },
-            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
-        });
-
-        // FOOTER
-        let date = new Date().toLocaleDateString('vi-VN');
-        doc.setFontSize(9);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Report generated on: ${date}`, 105, 285, { align: "center" });
-
-        // Tải file về máy
-        let fileName = fdr !== "N/A" && fdr.trim() !== "" ? `Report_${fdr}.pdf` : `Cable_Report.pdf`;
-        doc.save(fileName);
+        doc.text("• Make sure that you have provided all the required inputs for the conductor sizing.", 22, startY + 22);
+        doc.text("• It is recommended to refer to the cable manufacturer's catalogue before making the selection.", 22, startY + 28);
         
-        // Đóng Popup sau khi xuất xong
+        doc.setFont("Roboto", "bold");
+        doc.text("Failure to follow these instructions can result in incorrect bill of material and loss of business.", 18, startY + 38);
+        
+        // ================= MỤC LỤC =================
+        let tocY = startY + 55;
+        doc.setFontSize(14);
+        doc.setTextColor(0, 102, 204);
+        doc.text("Content", 14, tocY);
+        
+        doc.autoTable({
+            startY: tocY + 3,
+            theme: 'plain',
+            styles: { fontSize: 11, font: "Roboto", cellPadding: 2.5, textColor: 0 },
+            body: [
+                ['1. Information'],
+                ['2. Cable schedule'],
+                ['3. Calculation notes'],
+                ['    3.1. Cable & Environment Parameters'],
+                ['    3.2. Voltage Drop Check'],
+                ['    3.3. Short Circuit (Calculation of Isc by the impedance method)'],
+                ['4. Conclusion - Bill of Materials']
+            ],
+            margin: { left: 14, right: 14 }
+        });
+
+        // ================= NGẮT TRANG =================
+        doc.addPage();
+        
+        // ---- 1. INFORMATION ----
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.setFillColor(238, 238, 238);
+        doc.rect(14, 35, 182, 8, 'F');
+        doc.setFont("Roboto", "bold");
+        doc.text("1. Information", 16, 40.5);
+        
+        doc.autoTable({
+            startY: 45,
+            theme: 'grid',
+            styles: { fontSize: 10, textColor: 0, font: "Roboto" },
+            columnStyles: { 0: { fontStyle: 'bold', fillColor: [250, 250, 250], cellWidth: 50 } },
+            body: [
+                ['Name:', lastName],
+                ['First name:', firstName],
+                ['Company:', companyName],
+                ['Customer:', custName]
+            ],
+            margin: { top: 35, bottom: 25, left: 14, right: 14 }
+        });
+
+        // ---- 2. CABLE SCHEDULE ----
+        let finalY = doc.lastAutoTable.finalY + 10;
+        doc.setFillColor(238, 238, 238);
+        doc.rect(14, finalY, 182, 8, 'F');
+        doc.setFontSize(12);
+        doc.setFont("Roboto", "bold");
+        doc.text("2. Cable schedule", 16, finalY + 5.5);
+        
+        doc.autoTable({
+            startY: finalY + 10,
+            theme: 'grid',
+            headStyles: { fillColor: [221, 221, 221], textColor: 0, fontStyle: 'bold', halign: 'center', valign: 'middle', font: "Roboto" },
+            styles: { fontSize: 9, textColor: 0, halign: 'center', valign: 'middle', font: "Roboto" },
+            head: [['Feeder', 'Load type', 'Load', 'Type Insulation', 'L', 'Active conductor', 'PE/PEN / N', 'dU']],
+            body: [
+                [
+                    feedName, 
+                    currentResult.sysType === "3 pha" ? "3Ph+N" : "1Ph+N",
+                    currentResult.loadStr,
+                    `Single-core\n${currentResult.insul.split('/')[0]}`,
+                    `${currentResult.length} m`,
+                    `${currentResult.phase_cable}\n${currentResult.cond}`,
+                    `${currentResult.n_cable}\n${currentResult.cond}`,
+                    `${currentResult.dU_percent}%`
+                ]
+            ],
+            margin: { top: 35, bottom: 25, left: 14, right: 14 }
+        });
+
+        // ---- 3. CABLE & ENVIRONMENT CALCULATION NOTES ----
+        finalY = doc.lastAutoTable.finalY + 10;
+        if (finalY > 170) { 
+            doc.addPage(); 
+            finalY = 35; 
+        }
+        
+        doc.setFillColor(238, 238, 238);
+        doc.rect(14, finalY, 182, 8, 'F');
+        doc.setFontSize(12);
+        doc.setFont("Roboto", "bold");
+        doc.text("3. Calculation notes", 16, finalY + 5.5);
+
+        doc.autoTable({
+            startY: finalY + 10,
+            theme: 'grid',
+            styles: { fontSize: 9, textColor: 0, font: "Roboto" },
+            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' } },
+            body: [
+                [{content: '3.1. Cable & Environment Parameters', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
+                ['Length', `${currentResult.length} m`],
+                ['Installation method', `${currentResult.methodKey} - ${currentResult.methodDisplay}`],
+                ['Insulation', currentResult.insul],
+                [{content: 'Correction factors according to IEC 60364-5-52', colSpan: 2, fontStyle: 'bold', fillColor: [240, 240, 240]}],
+                ['Temperature factor (k1)', currentResult.temp_factor.toString()],
+                ['Soil thermal resistivity factor (k2)', currentResult.soil_factor.toString()],
+                ['Depth factor (k3)', currentResult.depth_factor ? currentResult.depth_factor.toString() : "-"],
+                ['Touching conductor factor (k4)', currentResult.touch_factor.toString()],
+                [{content: 'Overall factor (K)', fontStyle: 'bold'}, {content: currentResult.overall_K.toString(), fontStyle: 'bold'}],
+                [{content: 'Selected active conductor', colSpan: 2, fontStyle: 'bold', fillColor: [240, 240, 240]}],
+                ['Cross section area', `${currentResult.phase_cable} mm2`],
+                ['Core', currentResult.cond],
+                ['Iz under real conditions', `${currentResult.Iz_total} A`]
+            ],
+            margin: { top: 35, bottom: 25, left: 14, right: 14 }
+        });
+
+        // ---- 3.2 & 3.3 VOLTAGE DROP & SHORT CIRCUIT ----
+        finalY = doc.lastAutoTable.finalY;
+        doc.autoTable({
+            startY: finalY + 5,
+            theme: 'grid',
+            pageBreak: 'avoid', 
+            styles: { fontSize: 9, textColor: 0, font: "Roboto" },
+            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' } },
+            body: [
+                [{content: '3.2. Voltage Drop Check', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
+                [`Core temperature (steady state)`, `${currentResult.t_fixed} °C`],
+                [`Cable resistance Rt`, `${currentResult.rt_val} Ω/km`],
+                [`Calculated voltage drop`, `${currentResult.dU_val} V (${currentResult.dU_percent}%)`],
+                [`Maximum allowable voltage drop`, `${currentResult.dU_limit}%`],
+                
+                [{content: '3.3. Short Circuit', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
+                ['Max 3-phase short-circuit (Ik3)', currentResult.Ik3_str],
+                ['2-phase short-circuit (Ik2)', currentResult.Ik2_str],
+                ['Min 1-phase short-circuit (Ik1)', currentResult.Ik1_str],
+            ],
+            margin: { top: 35, bottom: 25, left: 14, right: 14 }
+        });
+
+        // ---- 4. CONCLUSION ----
+        finalY = doc.lastAutoTable.finalY + 10;
+        if (finalY > 225) { 
+            doc.addPage(); 
+            finalY = 35; 
+        }
+
+        doc.setFillColor(238, 238, 238);
+        doc.rect(14, finalY, 182, 8, 'F');
+        doc.setFontSize(12);
+        doc.setFont("Roboto", "bold");
+        doc.text("4. Conclusion - Bill of Materials", 16, finalY + 5.5);
+
+        doc.autoTable({
+            startY: finalY + 10,
+            theme: 'grid',
+            pageBreak: 'avoid',
+            styles: { fontSize: 10, textColor: 0, font: "Roboto" },
+            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: [0, 102, 51] } },
+            body: [
+                ['Selected Phase Cable', `${currentResult.phase_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
+                ['Selected Neutral Cable', `${currentResult.n_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
+                ['Circuit Breaker Rating (In)', `${currentResult.cb_In} A`],
+                ['Short-Circuit Breaking Capacity (Icu)', `≥ ${currentResult.cb_Icu} kA`]
+            ],
+            margin: { top: 35, bottom: 25, left: 14, right: 14 }
+        });
+
+        // ---- HEADER, WATERMARK & FOOTER CHO TOÀN BỘ CÁC TRANG ----
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            
+            // 1. VẼ WATERMARK (NẾU TẢI ẢNH THÀNH CÔNG)
+            if (watermark) {
+                doc.saveGraphicsState();
+                doc.setGState(new doc.GState({ opacity: 0.08 })); // Độ mờ 8%
+
+                // Tính toán tỷ lệ ảnh để không bị méo (Max Width = 160mm)
+                let imgWidth = 160;
+                let imgHeight = (watermark.height / watermark.width) * imgWidth;
+
+                // Nếu ảnh quá cao, cố định lại theo chiều cao
+                if (imgHeight > 200) {
+                    imgHeight = 160;
+                    imgWidth = (watermark.width / watermark.height) * imgHeight;
+                }
+
+                const imgX = (210 - imgWidth) / 2;  
+                const imgY = (297 - imgHeight) / 2; 
+
+                doc.addImage(watermark.base64, 'PNG', imgX, imgY, imgWidth, imgHeight);
+                doc.restoreGraphicsState();
+            }
+
+            // 2. Header
+            doc.setFontSize(16);
+            doc.setTextColor(0, 102, 204);
+            doc.setFont("Roboto", "bold");
+            doc.text(companyName, 14, 20);
+            
+            doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            doc.text("Cable Calculation Report", 196, 20, { align: "right" });
+            
+            doc.setLineWidth(0.5);
+            doc.setDrawColor(0, 0, 0);
+            doc.line(14, 23, 196, 23);
+            
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.setFont("Roboto", "normal");
+            doc.text(`Project: ${projName} | ${timestamp}`, 14, 28);
+
+            // 3. Footer
+            doc.setFontSize(7);
+            doc.setTextColor(150, 150, 150);
+            doc.setFont("Roboto", "italic");
+            doc.setLineWidth(0.1);
+            doc.setDrawColor(200, 200, 200);
+            doc.line(14, 278, 196, 278);
+            doc.text("This documentation is not intended as a substitute for and is not to be used for determining suitability or reliability of these products for specific user applications.", 14, 281);
+            doc.text("It is the duty of any such user or integrator to perform the appropriate and complete risk analysis, evaluation and testing of the products with respect to the relevant specific application", 14, 284);
+            doc.text("or use thereof.", 14, 287);
+            doc.text(`Project: ${projName} | Generated at: ${timestamp} | Page ${i}/${pageCount}`, 14, 290);
+        }
+
+        // Lưu PDF
+        let saveName = projName.replace(/\s+/g, '_') + '_Report.pdf';
+        doc.save(saveName);
+        
+        // Hoàn tất
+        btnConfirm.innerHTML = originalText;
+        btnConfirm.disabled = false;
         closeModal();
 
     } catch (error) {
-        console.error("Lỗi tạo PDF:", error);
-        alert("❌ Có lỗi xảy ra trong quá trình tạo PDF. Vui lòng kiểm tra Console log.");
-    } finally {
-        // Phục hồi nút bấm
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+        console.error("Lỗi xuất PDF: ", error);
+        btnConfirm.innerHTML = originalText;
+        btnConfirm.disabled = false;
+        alert("Có lỗi xảy ra khi tạo PDF. Hãy đảm bảo bạn có kết nối mạng để hệ thống tải font chữ tiếng Việt.");
     }
 }
     // ============================================================================
