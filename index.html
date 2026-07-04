@@ -490,8 +490,8 @@ function runCalculation() {
 
     if(Itt <= 0) { err.innerHTML = "⚠️ Vui lòng cấu hình dữ liệu thông số tải > 0."; err.style.display="block"; return; }
 
-let Itt_chon_cap = Itt * kDuTru; // THÊM MỚI: Tính dòng mang tải yêu cầu của cáp có xét hệ số dự trữ
-let Itt_cb = Itt; // Giữ nguyên dòng thực tế để chọn CB và tính sụt áp
+	let Itt_chon_cap = Itt * kDuTru; // THÊM MỚI: Tính dòng mang tải yêu cầu của cáp có xét hệ số dự trữ
+	let Itt_cb = Itt; // Giữ nguyên dòng thực tế để chọn CB và tính sụt áp
 
     let routing = document.getElementById("cable_routing").value;
     let isAir = routing === "Đi trên không/thang máng";
@@ -523,8 +523,8 @@ let Itt_cb = Itt; // Giữ nguyên dòng thực tế để chọn CB và tính s
         for(let a of search_area) {
             if(table[a] && table[a][methodKey]) {
                let amp = table[a][methodKey]; let Iz = amp * K_n; let Izt = Iz * n;
-if(Izt >= Itt_chon_cap) { // SỬA TẠI ĐÂY: Dùng Itt_chon_cap để chọn tiết diện cáp
-    let R0 = r_phys[a] || 0.01; let tf = insul.includes("XLPE") ? 90 : 70;
+				if(Izt >= Itt_chon_cap) { // SỬA TẠI ĐÂY: Dùng Itt_chon_cap để chọn tiết diện cáp
+    				let R0 = r_phys[a] || 0.01; let tf = insul.includes("XLPE") ? 90 : 70;
                     let alpha = cond==="Copper" ? 0.00393 : 0.00403; let rt = R0 * (1 + alpha*(tf-20));
                     let dU = sysType==="3 pha" ? Math.sqrt(3)*Itt*(rt/1000.0)*len*cosPhi/n : 2.0*Itt*(rt/1000.0)*len*cosPhi/n;
                     let dUp = (dU/U)*100.0;
@@ -598,12 +598,12 @@ if(Izt >= Itt_chon_cap) { // SỬA TẠI ĐÂY: Dùng Itt_chon_cap để chọn 
     };
 
     let html = `
-<h4>📊 A. Thông số kỹ thuật & Đề xuất cáp cho hệ thống (Theo TCVN 7447-5-52)</h4>
-<div style="color: #0F172A; line-height: 1.6; margin-bottom: 15px;">
-    • Dòng điện phụ tải tính toán thực tế (I<sub>tt</sub>): <b>${Itt.toFixed(2)} A</b><br>
-    • Hệ số dự trữ cấu hình (k<sub>dự trữ</sub>): <b>${kDuTru.toFixed(2)}</b><br>
-    • Dòng thiết kế để chọn tiết diện cáp (I<sub>cáp</sub> = I<sub>tt</sub> × k<sub>dự trữ</sub>): <b>${Itt_chon_cap.toFixed(2)} A</b><br>
-    • Dòng thiết kế phối hợp bảo vệ yêu cầu CB (I<sub>tt_cb</sub> = I<sub>tt</sub>): <b>${Itt_cb.toFixed(2)} A</b><br>
+	<h4>📊 A. Thông số kỹ thuật & Đề xuất cáp cho hệ thống (Theo TCVN 7447-5-52)</h4>
+	<div style="color: #0F172A; line-height: 1.6; margin-bottom: 15px;">
+   		• Dòng điện phụ tải tính toán thực tế (I<sub>tt</sub>): <b>${Itt.toFixed(2)} A</b><br>
+    	• Hệ số dự trữ cấu hình (k<sub>dự trữ</sub>): <b>${kDuTru.toFixed(2)}</b><br>
+    	• Dòng thiết kế để chọn tiết diện cáp (I<sub>cáp</sub> = I<sub>tt</sub> × k<sub>dự trữ</sub>): <b>${Itt_chon_cap.toFixed(2)} A</b><br>
+    	• Dòng thiết kế phối hợp bảo vệ yêu cầu CB (I<sub>tt_cb</sub> = I<sub>tt</sub>): <b>${Itt_cb.toFixed(2)} A</b><br>
         • Hệ số hiệu chỉnh môi trường áp dụng (K): <b>${best.K.toFixed(4)}</b><br>
         • Khả năng chịu dòng thực tế sau hiệu chỉnh của 1 sợi cáp (I<sub>z</sub>): <b>${best.Iz.toFixed(2)} A</b> (Dòng gốc bảng tra: ${best.amp} A)<br>
         • Tổng khả năng mang dòng cực đại của mạch chạy song song (${best.n} sợi): <b>${best.Izt.toFixed(2)} A</b><br>
