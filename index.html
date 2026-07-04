@@ -704,6 +704,132 @@ function getWatermarkImage(imageUrl) {
         img.src = imageUrl;
     });
 }
+	// ============================================================================
+// HÀM XUẤT BÁO CÁO PDF (BẢN TÓM TẮT DỰ ÁN)
+// ============================================================================
+function generatePDF() {
+    if(!currentResult) {
+        alert("Vui lòng chạy tính toán trước khi xuất báo cáo!");
+        return;
+    }
+
+    // Đổi trạng thái nút bấm để tránh click nhiều lần
+    let btn = document.getElementById("btn_confirm_pdf");
+    let originalText = btn.innerHTML;
+    btn.innerHTML = "⏳ ĐANG TẠO FILE PDF...";
+    btn.disabled = true;
+
+    try {
+        // Khởi tạo jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        // Lấy thông tin dự án từ popup
+        let prj = document.getElementById("pdf_project").value || "N/A";
+        let fdr = document.getElementById("pdf_feeder").value || "N/A";
+        let eng = document.getElementById("pdf_engineer").value || "N/A";
+        let cus = document.getElementById("pdf_customer").value || "N/A";
+        let com = document.getElementById("pdf_company").value || "N/A";
+
+        // Ghi chú quan trọng: Trình duyệt mặc định của jsPDF không hỗ trợ Tiếng Việt có dấu (sẽ bị lỗi font thành dấu ?).
+        // Do đó, template báo cáo dưới đây được tối ưu hóa hiển thị bằng Tiếng Anh chuẩn kỹ thuật.
+
+        // HEADER
+        doc.setFontSize(18);
+        doc.setTextColor(0, 102, 204);
+        doc.text("CABLE SIZING & CB SELECTION REPORT", 105, 20, { align: "center" });
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text("VAS Engineering System", 105, 26, { align: "center" });
+
+        // SECTION 1: PROJECT INFORMATION
+        doc.autoTable({
+            startY: 35,
+            head: [['Project Information', '']],
+            body: [
+                ['Project Name', prj],
+                ['Feeder Name', fdr],
+                ['Company', com],
+                ['Customer', cus],
+                ['Design Engineer', eng],
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [2, 132, 199], fontSize: 11 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
+        });
+
+        // SECTION 2: SYSTEM & LOAD PARAMETERS
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 10,
+            head: [['1. System & Load Parameters', '']],
+            body: [
+                ['System Type', currentResult.sysType],
+                ['Input Load', currentResult.loadStr],
+                ['Design Current (Base)', currentResult.Itt_cb + ' A'],
+                ['Cable Length', currentResult.length + ' m'],
+                ['Allowed Voltage Drop', currentResult.dU_limit + ' %'],
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [71, 85, 105], fontSize: 11 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
+        });
+
+        // SECTION 3: CABLE SELECTION RESULT
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 10,
+            head: [['2. Cable Selection Result', '']],
+            body: [
+                ['Conductor & Insulation', currentResult.cond + ' / ' + currentResult.insul],
+                ['Installation Method', currentResult.methodDisplay],
+                ['Overall Derating Factor (K)', currentResult.overall_K],
+                ['Phase Cable Size', currentResult.phase_cable + ' mm2'],
+                ['Neutral Cable Size', currentResult.n_cable + ' mm2'],
+                ['Total Ampacity (Iz)', currentResult.Iz_total + ' A'],
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [22, 163, 74], fontSize: 11 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
+        });
+
+        // SECTION 4: SHORT CIRCUIT & PROTECTION
+        doc.autoTable({
+            startY: doc.lastAutoTable.finalY + 10,
+            head: [['3. Protection & Verification', '']],
+            body: [
+                ['Voltage Drop (Actual)', currentResult.dU_percent + ' %  (' + currentResult.dU_val + ' V)'],
+                ['Max Short Circuit (Ik3)', currentResult.Ik3_str],
+                ['Min Short Circuit (Ik1)', currentResult.Ik1_str],
+                ['Proposed Circuit Breaker (In)', currentResult.cb_In + ' A'],
+                ['Required Breaking Cap. (Icu)', currentResult.cb_Icu + ' kA'],
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [220, 38, 38], fontSize: 11 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } }
+        });
+
+        // FOOTER
+        let date = new Date().toLocaleDateString('vi-VN');
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Report generated on: ${date}`, 105, 285, { align: "center" });
+
+        // Tải file về máy
+        let fileName = fdr !== "N/A" && fdr.trim() !== "" ? `Report_${fdr}.pdf` : `Cable_Report.pdf`;
+        doc.save(fileName);
+        
+        // Đóng Popup sau khi xuất xong
+        closeModal();
+
+    } catch (error) {
+        console.error("Lỗi tạo PDF:", error);
+        alert("❌ Có lỗi xảy ra trong quá trình tạo PDF. Vui lòng kiểm tra Console log.");
+    } finally {
+        // Phục hồi nút bấm
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
     // ============================================================================
 // HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CẬP NHẬT: ĐIỀU KIỆN K_DỰ_TRỮ & TẮT MẬT KHẨU)
 // ============================================================================
