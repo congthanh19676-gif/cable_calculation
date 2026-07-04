@@ -489,7 +489,9 @@ function runCalculation() {
     }
 
     if(Itt <= 0) { err.innerHTML = "⚠️ Vui lòng cấu hình dữ liệu thông số tải > 0."; err.style.display="block"; return; }
-    let Itt_cb = Itt;
+
+let Itt_chon_cap = Itt * kDuTru; // THÊM MỚI: Tính dòng mang tải yêu cầu của cáp có xét hệ số dự trữ
+let Itt_cb = Itt; // Giữ nguyên dòng thực tế để chọn CB và tính sụt áp
 
     let routing = document.getElementById("cable_routing").value;
     let isAir = routing === "Đi trên không/thang máng";
@@ -520,9 +522,9 @@ function runCalculation() {
         let K_n = computeK(n); if(K_n <= 0) continue;
         for(let a of search_area) {
             if(table[a] && table[a][methodKey]) {
-                let amp = table[a][methodKey]; let Iz = amp * K_n; let Izt = Iz * n;
-                if(Izt >= Itt_cb) {
-                    let R0 = r_phys[a] || 0.01; let tf = insul.includes("XLPE") ? 90 : 70;
+               let amp = table[a][methodKey]; let Iz = amp * K_n; let Izt = Iz * n;
+if(Izt >= Itt_chon_cap) { // SỬA TẠI ĐÂY: Dùng Itt_chon_cap để chọn tiết diện cáp
+    let R0 = r_phys[a] || 0.01; let tf = insul.includes("XLPE") ? 90 : 70;
                     let alpha = cond==="Copper" ? 0.00393 : 0.00403; let rt = R0 * (1 + alpha*(tf-20));
                     let dU = sysType==="3 pha" ? Math.sqrt(3)*Itt*(rt/1000.0)*len*cosPhi/n : 2.0*Itt*(rt/1000.0)*len*cosPhi/n;
                     let dUp = (dU/U)*100.0;
@@ -596,11 +598,12 @@ function runCalculation() {
     };
 
     let html = `
-    <h4>📊 A. Thông số kỹ thuật & Đề xuất cáp cho hệ thống (Theo TCVN 7447-5-52)</h4>
-    <div style="color: #0F172A; line-height: 1.6; margin-bottom: 15px;">
-        • Dòng điện phụ tải tính toán thực tế (I<sub>tt</sub>): <b>${Itt.toFixed(2)} A</b><br>
-        • Hệ số dự trữ cấu hình (k<sub>dự trữ</sub>): <b>${kDuTru.toFixed(2)}</b><br>
-        • Dòng thiết kế phối hợp bảo vệ yêu cầu (I<sub>tt_cb</sub> = I<sub>tt</sub>): <b>${Itt_cb.toFixed(2)} A</b><br>
+<h4>📊 A. Thông số kỹ thuật & Đề xuất cáp cho hệ thống (Theo TCVN 7447-5-52)</h4>
+<div style="color: #0F172A; line-height: 1.6; margin-bottom: 15px;">
+    • Dòng điện phụ tải tính toán thực tế (I<sub>tt</sub>): <b>${Itt.toFixed(2)} A</b><br>
+    • Hệ số dự trữ cấu hình (k<sub>dự trữ</sub>): <b>${kDuTru.toFixed(2)}</b><br>
+    • Dòng thiết kế để chọn tiết diện cáp (I<sub>cáp</sub> = I<sub>tt</sub> × k<sub>dự trữ</sub>): <b>${Itt_chon_cap.toFixed(2)} A</b><br>
+    • Dòng thiết kế phối hợp bảo vệ yêu cầu CB (I<sub>tt_cb</sub> = I<sub>tt</sub>): <b>${Itt_cb.toFixed(2)} A</b><br>
         • Hệ số hiệu chỉnh môi trường áp dụng (K): <b>${best.K.toFixed(4)}</b><br>
         • Khả năng chịu dòng thực tế sau hiệu chỉnh của 1 sợi cáp (I<sub>z</sub>): <b>${best.Iz.toFixed(2)} A</b> (Dòng gốc bảng tra: ${best.amp} A)<br>
         • Tổng khả năng mang dòng cực đại của mạch chạy song song (${best.n} sợi): <b>${best.Izt.toFixed(2)} A</b><br>
@@ -710,22 +713,29 @@ function exportExplanation() {
         return;
     }
 
+    // ============================================================================
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CẬP NHẬT: ĐIỀU KIỆN K_DỰ_TRỮ & TẮT MẬT KHẨU)
+// ============================================================================
+function exportExplanation() {
+    if(!currentResult) {
+        alert("Vui lòng chạy tính toán trước khi xuất thuyết minh!");
+        return;
+    }
+
     // ------------------------------------------------------------------------
-    // CẤU HÌNH MẬT KHẨU TẠI ĐÂY
+    // CÔNG TẮC BẢO MẬT (Đang tắt - để 'false'. Đổi thành 'true' để bật lại sau này)
     // ------------------------------------------------------------------------
-    const IS_PASSWORD_ENABLED = false; // CÔNG TẮC: Để 'false' là tắt, đổi thành 'true' là bật lại
-    const PASSWORD_PROTECT = "VAS2026"; 
+    const IS_PASSWORD_ENABLED = false; 
+    const PASSWORD_PROTECT = "VAS@2026"; 
+    
     if (IS_PASSWORD_ENABLED) {
         let userPassword = prompt("Vui lòng nhập mật khẩu để xuất Thuyết minh tính toán chi tiết:");
-        if (userPassword === null) {
-            return; // Đóng tab trắng nếu bấm Hủy
-        }
+        if (userPassword === null) return; 
         if (userPassword !== PASSWORD_PROTECT) {
             alert("🔒 Mật khẩu không chính xác! Bạn không có quyền xuất tài liệu này.");
             return;
         }
     }
-    // ------------------------------------------------------------------------
     
     let newWin = window.open("", "_blank");
     if (!newWin) {
@@ -741,23 +751,44 @@ function exportExplanation() {
     let s_ba = parseFloat(document.getElementById("s_ba").value);
     let u_k = parseFloat(document.getElementById("u_k").value);
     let isAir = currentResult.routing === "Đi trên không/thang máng";
-    let k_du_tru = parseFloat(document.getElementById("k_du_tru").value).toFixed(2);
     
-    // --- XỬ LÝ HỆ SỐ DỰ TRỮ VÀ DÒNG CƠ SỞ ---
-    // Tính ngược lại dòng cơ sở trước khi nhân hệ số dự trữ
-    let Itt_base = (parseFloat(currentResult.Itt_cb) / k_du_tru).toFixed(2);
-
+    // Xử lý logic Hệ số dự trữ (> 1 thì mới hiện)
+    let k_du_tru_val = parseFloat(document.getElementById("k_du_tru").value);
+    let hasReserve = k_du_tru_val > 1.0;
+    let inputSummaryReserveHTML = hasReserve ? `<li><b>Hệ số dự trữ phát triển tải (k<sub>dự trữ</sub>):</b> ${k_du_tru_val.toFixed(2)}</li>` : "";
+    
     // --- Xác định công thức cho đầu vào P, S, I ---
     let formulaHTML = ""; let explanationText = "";
+    let i_target = hasReserve ? "I<sub>cơ_sở</sub>" : "I<sub>tt</sub>";
+
     if (loadStr.includes("kW")) {
-        formulaHTML = is3Phase ? "I<sub>cơ_sở</sub> = (P × 1000) / (√3 × U × cosφ)" : "I<sub>cơ_sở</sub> = (P × 1000) / (U × cosφ)";
+        formulaHTML = is3Phase ? `${i_target} = (P × 1000) / (√3 × U × cosφ)` : `${i_target} = (P × 1000) / (U × cosφ)`;
         explanationText = "Đầu vào được khai báo là Công suất tác dụng P (kW). Dòng điện tính toán được quy đổi thông qua hệ số công suất cosφ.";
     } else if (loadStr.includes("kVA")) {
-        formulaHTML = is3Phase ? "I<sub>cơ_sở</sub> = (S × 1000) / (√3 × U)" : "I<sub>cơ_sở</sub> = (S × 1000) / U";
+        formulaHTML = is3Phase ? `${i_target} = (S × 1000) / (√3 × U)` : `${i_target} = (S × 1000) / U`;
         explanationText = "Đầu vào được khai báo là Công suất biểu kiến S (kVA). Dòng điện tính toán được quy đổi trực tiếp từ S.";
     } else {
-        formulaHTML = "I<sub>cơ_sở</sub> = I<sub>khai_báo</sub>";
-        explanationText = "Đầu vào được khai báo trực tiếp bằng dòng điện I (A). Dòng điện cơ sở sử dụng chính giá trị dòng điện đã nhập.";
+        formulaHTML = `${i_target} = I<sub>khai_báo</sub>`;
+        explanationText = "Đầu vào được khai báo trực tiếp bằng dòng điện I (A). Giá trị tính toán sử dụng chính giá trị dòng điện đã nhập.";
+    }
+
+    // --- Render mục 3: Tính toán dòng phụ tải ---
+    let loadCalculationHTML = "";
+    if (hasReserve) {
+    let Itt_chon_cap = (parseFloat(currentResult.Itt_cb) * k_du_tru_val).toFixed(2);
+    loadCalculationHTML = `
+    <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán thực tế (I<sub>tt</sub>) được xác định theo công thức:</p>
+    <div class="formula">${formulaHTML}</div>
+    <p>Thay số thực tế vào hệ thống, ta có: <b>I<sub>tt</sub> = ${currentResult.Itt_cb} A</b>.</p>
+    <p>Để đảm bảo an toàn và dự phòng phát triển phụ tải, hệ thống áp dụng thêm Hệ số dự trữ (k<sub>dự trữ</sub> = ${k_du_tru_val.toFixed(2)}) <b>làm cơ sở nâng cấp tiết diện cáp</b>. Do đó, dòng yêu cầu mang tải đối với cáp là:</p>
+    <div class="formula">I<sub>cáp</sub> = I<sub>tt</sub> × k<sub>dự trữ</sub> = ${currentResult.Itt_cb} × ${k_du_tru_val.toFixed(2)} = <b>${Itt_chon_cap} A</b></div>
+    `;
+} else {
+        loadCalculationHTML = `
+        <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán liên tục (I<sub>tt</sub>) làm cơ sở thiết kế được xác định theo công thức:</p>
+        <div class="formula">${formulaHTML}</div>
+        <p>Thực hiện thay số vào hệ thống, ta có kết quả dòng tính toán: <b>I<sub>tt</sub> = ${currentResult.Itt_cb} A</b>.</p>
+        `;
     }
 
     // --- Xử lý hệ số K2, K3 ---
@@ -967,7 +998,6 @@ function exportExplanation() {
             let rt_val = r0_val * (1 + alpha * (t_fixed - 20));
             let isHighlight = (s_float === phase_a);
             
-            // CSS highlight nguyên hàng (viền đỏ)
             let baseTdStyle = "padding: 7px;";
             let highlightStyles = isHighlight ? "background-color: #ffcccc; font-weight: bold; color: red; border-top: 3px solid red; border-bottom: 3px solid red;" : "border: 1px solid #000;";
             
@@ -982,15 +1012,11 @@ function exportExplanation() {
                 
             methods_arr.forEach((m, index) => {
                 let iz_val = row_data[m] !== undefined ? row_data[m] : "-";
-                
                 let cellStyle = tdMid;
                 if (index === methods_arr.length - 1) cellStyle = tdLast;
-                
-                // Highlight ĐẶC BIỆT ô phương thức xếp cáp được chọn
                 if (isHighlight && (m === currentResult.methodKey)) {
                     cellStyle += " background-color: #dc2626; color: white;"; 
                 }
-                
                 appendixTablesHTML += `<td style="${cellStyle}">${iz_val}</td>`;
             });
             appendixTablesHTML += `</tr>`;
@@ -1049,15 +1075,11 @@ function exportExplanation() {
             <li><b>Độ sụt áp tối đa cho phép:</b> ${currentResult.dU_limit}%</li>
             <li><b>Cấu hình cáp:</b> Vật liệu dẫn ${currentResult.cond === 'Copper' ? 'Đồng (Cu)' : 'Nhôm (Al)'}, cách điện ${currentResult.insul}</li>
             <li><b>Phương thức lắp đặt:</b> ${currentResult.routing} (Mã phương thức: ${currentResult.methodDisplay})</li>
-            <li><b>Hệ số dự trữ phát triển tải (k<sub>dự trữ</sub>):</b> ${k_du_tru}</li>
+            ${inputSummaryReserveHTML}
         </ul>
 
         <h2>3. Cơ sở tính toán dòng điện phụ tải</h2>
-        <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải cơ sở (I<sub>cơ_sở</sub>) được xác định theo công thức:</p>
-        <div class="formula">${formulaHTML}</div>
-        <p>Thay số thực tế vào hệ thống, ta có: <b>I<sub>cơ_sở</sub> = ${Itt_base} A</b>.</p>
-        <p>Để đảm bảo an toàn và dự phòng phát triển phụ tải trong tương lai, hệ thống áp dụng thêm Hệ số dự trữ (k<sub>dự trữ</sub> = ${k_du_tru}). Do đó, dòng điện tính toán thiết kế (I<sub>tt</sub>) làm cơ sở lựa chọn cáp và thiết bị đóng cắt là:</p>
-        <div class="formula">I<sub>tt</sub> = I<sub>cơ_sở</sub> × k<sub>dự trữ</sub> = ${Itt_base} × ${k_du_tru} = <b>${currentResult.Itt_cb} A</b></div>
+        ${loadCalculationHTML}
 
         <h2>4. Xác định hệ số hiệu chỉnh môi trường lắp đặt (K)</h2>
         <p>Dựa trên điều kiện lắp đặt khai báo và mã phương thức theo tiêu chuẩn TCVN 7447-5-52 (hoặc IEC 60364-5-52), khả năng tản nhiệt của cáp bị suy giảm. Hệ số hiệu chỉnh K tổng cộng được xác định qua công thức:</p>
