@@ -743,8 +743,8 @@ async function generatePDF() {
         const { jsPDF } = window.jspdf;
 		const doc = new jsPDF({
     		encryption: {
-        		ownerPassword: "VAS-Report-Secure-Key", // Bạn có thể đặt một mật khẩu phức tạp của riêng bạn
-        		userPermissions: ["print", "copy"] // Chỉ cấp quyền in ấn và bôi đen copy chữ. Không khai báo "modify".
+        		ownerPassword: "ThanhPro", // Bạn có thể đặt một mật khẩu phức tạp của riêng bạn
+        		userPermissions: ["print"] // Chỉ cấp quyền in ấn và bôi đen copy chữ. Không khai báo "modify".
     		}
 		});
 
