@@ -702,7 +702,7 @@ function getWatermarkImage(imageUrl) {
     });
 }
 // ============================================================================
-// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CẬP NHẬT: TRÍCH DẪN SỐ BẢNG TỪ PHỤ LỤC)
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CẬP NHẬT: HỆ SỐ DỰ TRỮ K_DỰ_TRỮ)
 // ============================================================================
 function exportExplanation() {
     if(!currentResult) {
@@ -713,14 +713,20 @@ function exportExplanation() {
     // ------------------------------------------------------------------------
     // CẤU HÌNH MẬT KHẨU TẠI ĐÂY
     // ------------------------------------------------------------------------
-    const PASSWORD_PROTECT = "ThanhPro"; 
+    const IS_PASSWORD_ENABLED = false; // CÔNG TẮC: Để 'false' là tắt, đổi thành 'true' là bật lại
+    const PASSWORD_PROTECT = "VAS2026"; 
     
-    let userPassword = prompt("Vui lòng nhập mật khẩu để xuất Thuyết minh tính toán chi tiết:");
-    if (userPassword === null) return; 
-    if (userPassword !== PASSWORD_PROTECT) {
-        alert("🔒 Mật khẩu không chính xác! Bạn không có quyền xuất tài liệu này.");
-        return;
+    if (IS_PASSWORD_ENABLED) {
+        let userPassword = prompt("Vui lòng nhập mật khẩu để xuất Thuyết minh tính toán chi tiết:");
+        if (userPassword === null) {
+            return; // Đóng tab trắng nếu bấm Hủy
+        }
+        if (userPassword !== PASSWORD_PROTECT) {
+            alert("🔒 Mật khẩu không chính xác! Bạn không có quyền xuất tài liệu này.");
+            return;
+        }
     }
+    // ------------------------------------------------------------------------
     
     let newWin = window.open("", "_blank");
     if (!newWin) {
@@ -736,24 +742,28 @@ function exportExplanation() {
     let s_ba = parseFloat(document.getElementById("s_ba").value);
     let u_k = parseFloat(document.getElementById("u_k").value);
     let isAir = currentResult.routing === "Đi trên không/thang máng";
+    let k_du_tru = parseFloat(document.getElementById("k_du_tru").value).toFixed(2);
     
+    // --- XỬ LÝ HỆ SỐ DỰ TRỮ VÀ DÒNG CƠ SỞ ---
+    // Tính ngược lại dòng cơ sở trước khi nhân hệ số dự trữ
+    let Itt_base = (parseFloat(currentResult.Itt_cb) / k_du_tru).toFixed(2);
+
     // --- Xác định công thức cho đầu vào P, S, I ---
     let formulaHTML = ""; let explanationText = "";
     if (loadStr.includes("kW")) {
-        formulaHTML = is3Phase ? "I<sub>tt</sub> = (P × 1000) / (√3 × U × cosφ)" : "I<sub>tt</sub> = (P × 1000) / (U × cosφ)";
+        formulaHTML = is3Phase ? "I<sub>cơ_sở</sub> = (P × 1000) / (√3 × U × cosφ)" : "I<sub>cơ_sở</sub> = (P × 1000) / (U × cosφ)";
         explanationText = "Đầu vào được khai báo là Công suất tác dụng P (kW). Dòng điện tính toán được quy đổi thông qua hệ số công suất cosφ.";
     } else if (loadStr.includes("kVA")) {
-        formulaHTML = is3Phase ? "I<sub>tt</sub> = (S × 1000) / (√3 × U)" : "I<sub>tt</sub> = (S × 1000) / U";
+        formulaHTML = is3Phase ? "I<sub>cơ_sở</sub> = (S × 1000) / (√3 × U)" : "I<sub>cơ_sở</sub> = (S × 1000) / U";
         explanationText = "Đầu vào được khai báo là Công suất biểu kiến S (kVA). Dòng điện tính toán được quy đổi trực tiếp từ S.";
     } else {
-        formulaHTML = "I<sub>tt</sub> = I<sub>khai_báo</sub>";
-        explanationText = "Đầu vào được khai báo trực tiếp bằng dòng điện I (A). Giá trị tính toán sử dụng chính giá trị dòng điện đã nhập.";
+        formulaHTML = "I<sub>cơ_sở</sub> = I<sub>khai_báo</sub>";
+        explanationText = "Đầu vào được khai báo trực tiếp bằng dòng điện I (A). Dòng điện cơ sở sử dụng chính giá trị dòng điện đã nhập.";
     }
 
-    // --- Xử lý hệ số K2, K3 (Kèm trích dẫn Bảng Phụ lục) ---
+    // --- Xử lý hệ số K2, K3 ---
     let k2_text = isAir ? "1.0 <i>(Chỉ áp dụng đối với trường hợp cáp đi chôn ngầm trong đất)</i>" : `<b>${currentResult.soil_factor}</b> <span style="color:#2563EB;"><i>(Tra tại Bảng 2 Phụ lục)</i></span>`;
     let k3_text = isAir ? "1.0 <i>(Chỉ áp dụng đối với trường hợp cáp đi chôn ngầm trong đất)</i>" : `<b>${currentResult.depth_factor}</b> <span style="color:#2563EB;"><i>(Tra tại Bảng 3 Phụ lục)</i></span>`;
-    
     let envTemp = parseInt(isAir ? document.getElementById("air_temp").value : document.getElementById("ground_temp").value);
     let groupMethod = isAir ? document.getElementById("air_arr").value : document.getElementById("ground_arr").value;
     
@@ -1040,12 +1050,15 @@ function exportExplanation() {
             <li><b>Độ sụt áp tối đa cho phép:</b> ${currentResult.dU_limit}%</li>
             <li><b>Cấu hình cáp:</b> Vật liệu dẫn ${currentResult.cond === 'Copper' ? 'Đồng (Cu)' : 'Nhôm (Al)'}, cách điện ${currentResult.insul}</li>
             <li><b>Phương thức lắp đặt:</b> ${currentResult.routing} (Mã phương thức: ${currentResult.methodDisplay})</li>
+            <li><b>Hệ số dự trữ phát triển tải (k<sub>dự trữ</sub>):</b> ${k_du_tru}</li>
         </ul>
 
-        <h2>3. Cơ sở tính toán dòng điện phụ tải (I<sub>tt</sub>)</h2>
-        <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán liên tục (I<sub>tt</sub>) làm cơ sở thiết kế được xác định theo công thức:</p>
+        <h2>3. Cơ sở tính toán dòng điện phụ tải</h2>
+        <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải cơ sở (I<sub>cơ_sở</sub>) được xác định theo công thức:</p>
         <div class="formula">${formulaHTML}</div>
-        <p>Thực hiện thay số vào hệ thống, ta có kết quả dòng tính toán: <b>I<sub>tt</sub> = ${currentResult.Itt_cb} A</b>.</p>
+        <p>Thay số thực tế vào hệ thống, ta có: <b>I<sub>cơ_sở</sub> = ${Itt_base} A</b>.</p>
+        <p>Để đảm bảo an toàn và dự phòng phát triển phụ tải trong tương lai, hệ thống áp dụng thêm Hệ số dự trữ (k<sub>dự trữ</sub> = ${k_du_tru}). Do đó, dòng điện tính toán thiết kế (I<sub>tt</sub>) làm cơ sở lựa chọn cáp và thiết bị đóng cắt là:</p>
+        <div class="formula">I<sub>tt</sub> = I<sub>cơ_sở</sub> × k<sub>dự trữ</sub> = ${Itt_base} × ${k_du_tru} = <b>${currentResult.Itt_cb} A</b></div>
 
         <h2>4. Xác định hệ số hiệu chỉnh môi trường lắp đặt (K)</h2>
         <p>Dựa trên điều kiện lắp đặt khai báo và mã phương thức theo tiêu chuẩn TCVN 7447-5-52 (hoặc IEC 60364-5-52), khả năng tản nhiệt của cáp bị suy giảm. Hệ số hiệu chỉnh K tổng cộng được xác định qua công thức:</p>
@@ -1149,7 +1162,7 @@ function exportExplanation() {
         </div>
 
         <h2>9. Kiểm tra khả năng chịu dòng ngắn mạch của cáp (Theo IEC 60949)</h2>
-        <p>Mục đích nhằm kiểm tra khả năng chịu dòng sự cố I<sub>AD</sub> của dây dẫn đề xuất. Thời gian chịu dòng ngắn mạch tính toán được <b>chọn t = 1s</b> (có tính dự phòng an toàn cao, do thực tế các thiết bị đóng cắt ACB/MCCB ngắt sự cố ở dòng cắt định mức chỉ trong khoảng 0.05 - 0.1s).</p>
+        <p>Mục đích nhằm kiểm tra khả năng chịu dòng sự cố I<sub>AD</sub> của dây dẫn đề xuất. Thời gian chịu dòng ngắn mạch tính toán được <b>chọn t = 1s</b> (có tính dự phòng an toàn cao, do thực tế các thiết bị đóng cắt ACB/MCCB ngắt sự cố ở 50kA chỉ trong khoảng 0.05 - 0.1s).</p>
         <div class="formula">
             I<sub>AD</sub> = (K × S / √t) × √[ ln((θ<sub>f</sub> + β) / (θ<sub>i</sub> + β)) ]
         </div>
