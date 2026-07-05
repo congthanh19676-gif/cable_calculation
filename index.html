@@ -1026,8 +1026,8 @@ async function generatePDF() {
         alert("Có lỗi xảy ra khi tạo PDF. Hãy đảm bảo bạn có kết nối mạng để hệ thống tải font chữ tiếng Việt.");
     }
 }
-    // ============================================================================
-// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CẬP NHẬT: ĐIỀU KIỆN K_DỰ_TRỮ & TẮT MẬT KHẨU)
+// ============================================================================
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CẬP NHẬT: CHỈNH ĐỊNH K VÀ DÒNG Ir Ở MỤC 8)
 // ============================================================================
 function exportExplanation() {
     if(!currentResult) {
@@ -1039,7 +1039,7 @@ function exportExplanation() {
     // CÔNG TẮC BẢO MẬT (Đang tắt - để 'false'. Đổi thành 'true' để bật lại sau này)
     // ------------------------------------------------------------------------
     const IS_PASSWORD_ENABLED = false; 
-    const PASSWORD_PROTECT = "VAS@2026"; 
+    const PASSWORD_PROTECT = "ThanhPro"; 
     
     if (IS_PASSWORD_ENABLED) {
         let userPassword = prompt("Vui lòng nhập mật khẩu để xuất Thuyết minh tính toán chi tiết:");
@@ -1049,6 +1049,7 @@ function exportExplanation() {
             return;
         }
     }
+    
     let newWin = window.open("", "_blank");
     if (!newWin) {
         alert("⚠️ Trình duyệt của bạn đã chặn tự động mở Tab mới (Popup Blocker).\n\n👉 CÁCH KHẮC PHỤC: Hãy click vào biểu tượng ❌ màu đỏ trên thanh địa chỉ, chọn 'Luôn cho phép' và thử lại!");
@@ -1087,15 +1088,15 @@ function exportExplanation() {
     // --- Render mục 3: Tính toán dòng phụ tải ---
     let loadCalculationHTML = "";
     if (hasReserve) {
-    let Itt_chon_cap = (parseFloat(currentResult.Itt_cb) * k_du_tru_val).toFixed(2);
-    loadCalculationHTML = `
-    <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán thực tế (I<sub>tt</sub>) được xác định theo công thức:</p>
-    <div class="formula">${formulaHTML}</div>
-    <p>Thay số thực tế vào hệ thống, ta có: <b>I<sub>tt</sub> = ${currentResult.Itt_cb} A</b>.</p>
-    <p>Để đảm bảo an toàn và dự phòng phát triển phụ tải, hệ thống áp dụng thêm Hệ số dự trữ (k<sub>dự trữ</sub> = ${k_du_tru_val.toFixed(2)}) <b>làm cơ sở nâng cấp tiết diện cáp</b>. Do đó, dòng yêu cầu mang tải đối với cáp là:</p>
-    <div class="formula">I<sub>cáp</sub> = I<sub>tt</sub> × k<sub>dự trữ</sub> = ${currentResult.Itt_cb} × ${k_du_tru_val.toFixed(2)} = <b>${Itt_chon_cap} A</b></div>
-    `;
-} else {
+        let Itt_base = (parseFloat(currentResult.Itt_cb) / k_du_tru_val).toFixed(2);
+        loadCalculationHTML = `
+        <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải cơ sở (I<sub>cơ_sở</sub>) được xác định theo công thức:</p>
+        <div class="formula">${formulaHTML}</div>
+        <p>Thay số thực tế vào hệ thống, ta có: <b>I<sub>cơ_sở</sub> = ${Itt_base} A</b>.</p>
+        <p>Để đảm bảo an toàn và dự phòng phát triển phụ tải trong tương lai, hệ thống áp dụng thêm Hệ số dự trữ (k<sub>dự trữ</sub> = ${k_du_tru_val.toFixed(2)}). Do đó, dòng điện tính toán thiết kế (I<sub>tt</sub>) làm cơ sở lựa chọn cáp và thiết bị đóng cắt là:</p>
+        <div class="formula">I<sub>tt</sub> = I<sub>cơ_sở</sub> × k<sub>dự trữ</sub> = ${Itt_base} × ${k_du_tru_val.toFixed(2)} = <b>${currentResult.Itt_cb} A</b></div>
+        `;
+    } else {
         loadCalculationHTML = `
         <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán liên tục (I<sub>tt</sub>) làm cơ sở thiết kế được xác định theo công thức:</p>
         <div class="formula">${formulaHTML}</div>
@@ -1134,6 +1135,38 @@ function exportExplanation() {
     let Z1 = Math.sqrt(Math.pow(Rba + Rp + Rn, 2) + Math.pow(Xba + Xp + Xn, 2));
     let U_phase = is3Phase ? U / Math.sqrt(3) : U;
     let Ik3 = Z3 > 0 ? U / (Math.sqrt(3) * Z3) : 0;
+
+    // --- TÁI TÍNH TOÁN CB ĐỂ TÌM HỆ SỐ K CHỈNH ĐỊNH ---
+    let Itt_cb_val = parseFloat(currentResult.Itt_cb);
+    let Iz_total_val = parseFloat(currentResult.Iz_total);
+    const cb_table_1p = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160];
+    const cb_table_3p = [6, 10, 16, 20, 25, 32, 40, 50, 63, 75, 80, 100, 125, 160, 175, 200, 225, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6300, 8000, 10000];
+    let cb_list = is3Phase ? cb_table_3p : cb_table_1p;
+    
+    let sel_In = cb_list.find(x => x >= Itt_cb_val) || cb_list[cb_list.length-1];
+    let sel_k = 1.0;
+    let sel_Ir = sel_In;
+
+    if (sel_In > 1000) {
+        let k_opts = [1.0, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4]; 
+        let valids_cb = [];
+        for (let inv of cb_list) {
+            if (inv > 1000) {
+                for (let kv of k_opts) {
+                    let irv = inv * kv; 
+                    if (irv >= Itt_cb_val && irv <= Iz_total_val) {
+                        valids_cb.push({In: inv, k: kv, Ir: irv, diff: Math.abs(irv - Itt_cb_val)});
+                    }
+                }
+            }
+        }
+        if (valids_cb.length > 0) {
+            valids_cb.sort((a,b) => a.In !== b.In ? a.In - b.In : a.diff - b.diff);
+            sel_In = valids_cb[0].In; 
+            sel_k = valids_cb[0].k; 
+            sel_Ir = valids_cb[0].Ir;
+        }
+    }
 
     // --- TÍNH TOÁN IEC 60949 ---
     let k_mat = currentResult.cond === "Copper" ? 226 : 148;
@@ -1490,12 +1523,15 @@ function exportExplanation() {
         </ul>
         <div class="highlight">
             <b>CẤU HÌNH CB ĐỀ XUẤT:</b><br><br>
-            • Chọn dòng định mức (I<sub>n</sub>) là: <b>${currentResult.cb_In} A</b> (Phù hợp vì ${currentResult.Itt_cb} A ≤ ${currentResult.cb_In} A ≤ ${currentResult.Iz_total} A).<br>
+            • Chọn dòng định mức (I<sub>n</sub>) là: <b>${sel_In} A</b>.<br>
+            ${sel_k < 1.0 ? `• Áp dụng chỉnh định hệ số k = <b>${sel_k}</b> ➔ Dòng bảo vệ nhiệt thực tế <b>I<sub>r</sub> = ${sel_Ir.toFixed(2)} A</b><br>
+            <i>(Phù hợp vì ${currentResult.Itt_cb} A ≤ I<sub>r</sub> ${sel_Ir.toFixed(2)} A ≤ I<sub>z</sub> ${currentResult.Iz_total} A)</i>.<br>` : `• Dòng bảo vệ nhiệt (I<sub>r</sub> = I<sub>n</sub>): <b>${sel_In} A</b><br>
+            <i>(Phù hợp vì ${currentResult.Itt_cb} A ≤ I<sub>r</sub> ${sel_In} A ≤ I<sub>z</sub> ${currentResult.Iz_total} A)</i>.<br>`}
             • Chọn khả năng cắt ngắn mạch tối thiểu (I<sub>cu</sub>) là: <b>${currentResult.cb_Icu} kA</b>.
         </div>
 
         <h2>9. Kiểm tra khả năng chịu dòng ngắn mạch của cáp (Theo IEC 60949)</h2>
-        <p>Mục đích nhằm kiểm tra khả năng chịu dòng sự cố I<sub>AD</sub> của dây dẫn đề xuất. Thời gian chịu dòng ngắn mạch tính toán được <b>chọn t = 1s</b> (có tính dự phòng an toàn cao, do thực tế các thiết bị đóng cắt ACB/MCCB ngắt sự cố tại dòng cắt định mức chỉ trong khoảng 0.05 - 0.1s).</p>
+        <p>Mục đích nhằm kiểm tra khả năng chịu dòng sự cố I<sub>AD</sub> của dây dẫn đề xuất. Thời gian chịu dòng ngắn mạch tính toán được <b>chọn t = 1s</b> (có tính dự phòng an toàn cao, do thực tế các thiết bị đóng cắt ACB/MCCB ngắt sự cố ở 50kA chỉ trong khoảng 0.05 - 0.1s).</p>
         <div class="formula">
             I<sub>AD</sub> = (K × S / √t) × √[ ln((θ<sub>f</sub> + β) / (θ<sub>i</sub> + β)) ]
         </div>
