@@ -1027,7 +1027,7 @@ async function generatePDF() {
     }
 }
 // ============================================================================
-// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (CẬP NHẬT: CHỈNH ĐỊNH K VÀ DÒNG Ir Ở MỤC 8)
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (ĐÃ SỬA LỖI LOGIC K_DỰ_TRỮ)
 // ============================================================================
 function exportExplanation() {
     if(!currentResult) {
@@ -1065,14 +1065,18 @@ function exportExplanation() {
     let u_k = parseFloat(document.getElementById("u_k").value);
     let isAir = currentResult.routing === "Đi trên không/thang máng";
     
-    // Xử lý logic Hệ số dự trữ (> 1 thì mới hiện)
+    // --- XỬ LÝ LOGIC DÒNG CƠ SỞ & HỆ SỐ DỰ TRỮ ---
     let k_du_tru_val = parseFloat(document.getElementById("k_du_tru").value);
     let hasReserve = k_du_tru_val > 1.0;
     let inputSummaryReserveHTML = hasReserve ? `<li><b>Hệ số dự trữ phát triển tải (k<sub>dự trữ</sub>):</b> ${k_du_tru_val.toFixed(2)}</li>` : "";
     
-    // --- Xác định công thức cho đầu vào P, S, I ---
+    // currentResult.Itt_cb chính là dòng cơ sở (chưa nhân k_dự_trữ) được lưu từ runCalculation
+    let I_co_so = parseFloat(currentResult.Itt_cb).toFixed(2);
+    let I_thiet_ke = (parseFloat(currentResult.Itt_cb) * k_du_tru_val).toFixed(2);
+
+    // Xác định công thức cho đầu vào P, S, I
     let formulaHTML = ""; let explanationText = "";
-    let i_target = hasReserve ? "I<sub>cơ_sở</sub>" : "I<sub>tt</sub>";
+    let i_target = "I<sub>cơ_sở</sub>";
 
     if (loadStr.includes("kW")) {
         formulaHTML = is3Phase ? `${i_target} = (P × 1000) / (√3 × U × cosφ)` : `${i_target} = (P × 1000) / (U × cosφ)`;
@@ -1085,22 +1089,21 @@ function exportExplanation() {
         explanationText = "Đầu vào được khai báo trực tiếp bằng dòng điện I (A). Giá trị tính toán sử dụng chính giá trị dòng điện đã nhập.";
     }
 
-    // --- Render mục 3: Tính toán dòng phụ tải ---
+    // Render HTML phần tính dòng
     let loadCalculationHTML = "";
     if (hasReserve) {
-        let Itt_base = (parseFloat(currentResult.Itt_cb) / k_du_tru_val).toFixed(2);
         loadCalculationHTML = `
         <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải cơ sở (I<sub>cơ_sở</sub>) được xác định theo công thức:</p>
         <div class="formula">${formulaHTML}</div>
-        <p>Thay số thực tế vào hệ thống, ta có: <b>I<sub>cơ_sở</sub> = ${Itt_base} A</b>.</p>
-        <p>Để đảm bảo an toàn và dự phòng phát triển phụ tải trong tương lai, hệ thống áp dụng thêm Hệ số dự trữ (k<sub>dự trữ</sub> = ${k_du_tru_val.toFixed(2)}). Do đó, dòng điện tính toán thiết kế (I<sub>tt</sub>) làm cơ sở lựa chọn cáp và thiết bị đóng cắt là:</p>
-        <div class="formula">I<sub>tt</sub> = I<sub>cơ_sở</sub> × k<sub>dự trữ</sub> = ${Itt_base} × ${k_du_tru_val.toFixed(2)} = <b>${currentResult.Itt_cb} A</b></div>
+        <p>Thay số thực tế vào hệ thống, ta có: <b>I<sub>cơ_sở</sub> = ${I_co_so} A</b>.</p>
+        <p>Để đảm bảo an toàn và dự phòng phát triển phụ tải trong tương lai, hệ thống áp dụng thêm Hệ số dự trữ (k<sub>dự trữ</sub> = ${k_du_tru_val.toFixed(2)}). Do đó, dòng điện tính toán thiết kế (I<sub>tt</sub>) làm cơ sở lựa chọn cáp là:</p>
+        <div class="formula">I<sub>tt</sub> = I<sub>cơ_sở</sub> × k<sub>dự trữ</sub> = ${I_co_so} × ${k_du_tru_val.toFixed(2)} = <b>${I_thiet_ke} A</b></div>
         `;
     } else {
         loadCalculationHTML = `
         <p>${explanationText} Căn cứ theo nguyên lý kỹ thuật điện, dòng điện phụ tải tính toán liên tục (I<sub>tt</sub>) làm cơ sở thiết kế được xác định theo công thức:</p>
         <div class="formula">${formulaHTML}</div>
-        <p>Thực hiện thay số vào hệ thống, ta có kết quả dòng tính toán: <b>I<sub>tt</sub> = ${currentResult.Itt_cb} A</b>.</p>
+        <p>Thực hiện thay số vào hệ thống, ta có kết quả dòng tính toán: <b>I<sub>tt</sub> = I<sub>cơ_sở</sub> = ${I_co_so} A</b>.</p>
         `;
     }
 
@@ -1137,7 +1140,7 @@ function exportExplanation() {
     let Ik3 = Z3 > 0 ? U / (Math.sqrt(3) * Z3) : 0;
 
     // --- TÁI TÍNH TOÁN CB ĐỂ TÌM HỆ SỐ K CHỈNH ĐỊNH ---
-    let Itt_cb_val = parseFloat(currentResult.Itt_cb);
+    let Itt_cb_val = parseFloat(currentResult.Itt_cb); // Dòng dùng để chọn CB
     let Iz_total_val = parseFloat(currentResult.Iz_total);
     const cb_table_1p = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160];
     const cb_table_3p = [6, 10, 16, 20, 25, 32, 40, 50, 63, 75, 80, 100, 125, 160, 175, 200, 225, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6300, 8000, 10000];
@@ -1180,7 +1183,6 @@ function exportExplanation() {
     let I_AD_total = I_AD_single * phase_n;
     let is_Iad_pass = I_AD_total >= Ik3;
     let iad_status = is_Iad_pass ? "<b style='color:#16A34A;'>ĐẠT</b>" : "<b style='color:#DC2626;'>KHÔNG ĐẠT</b>";
-
 
     // ========================================================================
     // TẠO HTML CÁC BẢNG TRA CHI TIẾT TRONG PHỤ LỤC (RENDER TỰ ĐỘNG)
@@ -1438,7 +1440,7 @@ function exportExplanation() {
         <p>Tổng hệ số hiệu chỉnh áp dụng cho việc chọn cáp là: <b>K = ${currentResult.overall_K}</b>.</p>
 
         <h2>5. Tính toán và Lựa chọn tiết diện cáp</h2>
-        <p>Điều kiện bắt buộc: Khả năng mang dòng liên tục thực tế của hệ thống cáp (I<sub>z_total</sub>) sau khi đã hiệu chỉnh phải lớn hơn hoặc bằng dòng điện phụ tải (I<sub>tt</sub>):</p>
+        <p>Điều kiện bắt buộc: Khả năng mang dòng liên tục thực tế của hệ thống cáp (I<sub>z_total</sub>) sau khi đã hiệu chỉnh phải lớn hơn hoặc bằng dòng điện phụ tải thiết kế (I<sub>tt</sub>):</p>
         <div class="formula">I<sub>z_total</sub> = (I<sub>z_bảng_tra</sub> × K) × số_sợi_song_song ≥ I<sub>tt</sub></div>
         <div class="highlight">
             Căn cứ vòng lặp đối chiếu thuật toán với catalogue cáp cách điện <b>${currentResult.insul}</b>, hệ thống đã đề xuất cấu hình: <b>${currentResult.phase_cable} mm²</b>.<br><br>
@@ -1446,11 +1448,11 @@ function exportExplanation() {
             • Khả năng mang dòng thực tế của 1 mạch (sau hiệu chỉnh K): I<sub>z</sub> = ${currentResult.Iz_single} A.<br>
             • Tổng khả năng mang dòng của thiết kế: <b>I<sub>z_total</sub> = ${currentResult.Iz_total} A</b>.
         </div>
-        <p>Vì <b>${currentResult.Iz_total} A ≥ ${currentResult.Itt_cb} A</b>, cấu hình cáp này hoàn toàn đạt yêu cầu về khả năng mang tải nhiệt liên tục.</p>
+        <p>Vì <b>${currentResult.Iz_total} A ≥ ${hasReserve ? I_thiet_ke : I_co_so} A</b>, cấu hình cáp này hoàn toàn đạt yêu cầu về khả năng mang tải nhiệt liên tục.</p>
 
         <h2>6. Kiểm tra điều kiện sụt áp (ΔU)</h2>
         <p>Tiết diện cáp được kiểm tra chéo với điều kiện sụt áp, đảm bảo phần trăm sụt áp tại cuối đường dây không vượt quá mức cho phép (${currentResult.dU_limit}%).</p>
-        <div class="formula">ΔU = ${is3Phase ? "√3" : "2"} × I<sub>tt</sub> × L × (R<sub>t</sub> × cosφ + X × sinφ) / (1000 × n)</div>
+        <div class="formula">ΔU = ${is3Phase ? "√3" : "2"} × I<sub>cơ_sở</sub> × L × (R<sub>t</sub> × cosφ + X × sinφ) / (1000 × n)</div>
         
         <p>Trong đó, <b>R<sub>t</sub></b> là điện trở phần ứng của cáp ở nhiệt độ làm việc cực đại định mức (${t_fixed}°C), được tính toán quy đổi từ giá trị điện trở một chiều (DC) chuẩn ở 20°C (R<sub>0</sub>) theo công thức:</p>
         <div class="formula">R<sub>t</sub> = R<sub>0</sub> × [1 + α × (θ<sub>f</sub> - 20)]</div>
@@ -1518,15 +1520,15 @@ function exportExplanation() {
         <h2>8. Chọn lựa thiết bị đóng cắt bảo vệ (CB)</h2>
         <p>Căn cứ theo tiêu chuẩn thiết kế lắp đặt điện, CB bảo vệ cáp phải thỏa mãn đồng thời hai điều kiện vật lý cốt lõi:</p>
         <ul>
-            <li><b>Điều kiện bảo vệ quá tải:</b> I<sub>tt</sub> ≤ I<sub>n</sub> (hoặc I<sub>r</sub> chỉnh định) ≤ I<sub>z_total</sub></li>
+            <li><b>Điều kiện bảo vệ quá tải:</b> I<sub>cơ_sở</sub> ≤ I<sub>n</sub> (hoặc I<sub>r</sub> chỉnh định) ≤ I<sub>z_total</sub></li>
             <li><b>Điều kiện cắt ngắn mạch:</b> I<sub>cu</sub> (Khả năng cắt ngắn mạch tới hạn) ≥ I<sub>k3</sub> (hoặc I<sub>k1</sub> đối với lưới 1 pha)</li>
         </ul>
         <div class="highlight">
             <b>CẤU HÌNH CB ĐỀ XUẤT:</b><br><br>
             • Chọn dòng định mức (I<sub>n</sub>) là: <b>${sel_In} A</b>.<br>
             ${sel_k < 1.0 ? `• Áp dụng chỉnh định hệ số k = <b>${sel_k}</b> ➔ Dòng bảo vệ nhiệt thực tế <b>I<sub>r</sub> = ${sel_Ir.toFixed(2)} A</b><br>
-            <i>(Phù hợp vì ${currentResult.Itt_cb} A ≤ I<sub>r</sub> ${sel_Ir.toFixed(2)} A ≤ I<sub>z</sub> ${currentResult.Iz_total} A)</i>.<br>` : `• Dòng bảo vệ nhiệt (I<sub>r</sub> = I<sub>n</sub>): <b>${sel_In} A</b><br>
-            <i>(Phù hợp vì ${currentResult.Itt_cb} A ≤ I<sub>r</sub> ${sel_In} A ≤ I<sub>z</sub> ${currentResult.Iz_total} A)</i>.<br>`}
+            <i>(Phù hợp vì I<sub>cơ_sở</sub> ${I_co_so} A ≤ I<sub>r</sub> ${sel_Ir.toFixed(2)} A ≤ I<sub>z</sub> ${currentResult.Iz_total} A)</i>.<br>` : `• Dòng bảo vệ nhiệt (I<sub>r</sub> = I<sub>n</sub>): <b>${sel_In} A</b><br>
+            <i>(Phù hợp vì I<sub>cơ_sở</sub> ${I_co_so} A ≤ I<sub>r</sub> ${sel_In} A ≤ I<sub>z</sub> ${currentResult.Iz_total} A)</i>.<br>`}
             • Chọn khả năng cắt ngắn mạch tối thiểu (I<sub>cu</sub>) là: <b>${currentResult.cb_Icu} kA</b>.
         </div>
 
