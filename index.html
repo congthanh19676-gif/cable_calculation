@@ -729,6 +729,38 @@ async function generatePDF() {
     let timestamp = ("0" + now.getDate()).slice(-2) + "/" + ("0" + (now.getMonth() + 1)).slice(-2) + "/" + now.getFullYear() + " " + 
                     now.toLocaleTimeString('en-US', {hour12: true, hour: '2-digit', minute:'2-digit', second:'2-digit'});
 
+    // --- TÁI TÍNH TOÁN CB ĐỂ TÌM HỆ SỐ K CHỈNH ĐỊNH CHO BẢNG BOM ---
+    let Itt_cb_val = parseFloat(currentResult.Itt_cb);
+    let Iz_total_val = parseFloat(currentResult.Iz_total);
+    const cb_table_1p = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160];
+    const cb_table_3p = [6, 10, 16, 20, 25, 32, 40, 50, 63, 75, 80, 100, 125, 160, 175, 200, 225, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6300, 8000, 10000];
+    let cb_list = currentResult.sysType === "3 pha" ? cb_table_3p : cb_table_1p;
+    
+    let sel_In = cb_list.find(x => x >= Itt_cb_val) || cb_list[cb_list.length-1];
+    let sel_k = 1.0;
+    let sel_Ir = sel_In;
+
+    if (sel_In > 1000) {
+        let k_opts = [1.0, 0.98, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4]; 
+        let valids_cb = [];
+        for (let inv of cb_list) {
+            if (inv > 1000) {
+                for (let kv of k_opts) {
+                    let irv = inv * kv; 
+                    if (irv >= Itt_cb_val && irv <= Iz_total_val) {
+                        valids_cb.push({In: inv, k: kv, Ir: irv, diff: Math.abs(irv - Itt_cb_val)});
+                    }
+                }
+            }
+        }
+        if (valids_cb.length > 0) {
+            valids_cb.sort((a,b) => a.In !== b.In ? a.In - b.In : a.diff - b.diff);
+            sel_In = valids_cb[0].In; 
+            sel_k = valids_cb[0].k; 
+            sel_Ir = valids_cb[0].Ir;
+        }
+    }
+
     try {
         // --- 1. TẢI ẢNH WATERMARK TRƯỚC KHI TẠO PDF ---
         let watermark = null;
@@ -736,14 +768,14 @@ async function generatePDF() {
             // Tải ảnh từ thư mục images. 
             watermark = await getWatermarkImage('images/VAS.png');
         } catch (imgErr) {
-            console.warn("Lưu ý: Không thể tải ảnh watermark (Có thể do chạy file .html offline hoặc sai đường dẫn). Hệ thống vẫn tiếp tục xuất PDF.", imgErr);
+            console.warn("Lưu ý: Không thể tải ảnh watermark. Hệ thống vẫn tiếp tục xuất PDF.", imgErr);
         }
 
         const { jsPDF } = window.jspdf;
 		const doc = new jsPDF({
     		encryption: {
-        		ownerPassword: "ThanhPro", // Bạn có thể đặt một mật khẩu phức tạp của riêng bạn
-        		userPermissions: ["print"] // Chỉ cấp quyền in ấn và bôi đen copy chữ. Không khai báo "modify".
+        		ownerPassword: "ThanhPro",
+        		userPermissions: ["print"]
     		}
 		});
 
@@ -875,9 +907,7 @@ async function generatePDF() {
         doc.setFont("Roboto", "bold");
         doc.text("3. Calculation notes", 16, finalY + 5.5);
 
-        // Logic tính toán lại dòng diện để hiển thị
         let kDuTru = parseFloat(document.getElementById("k_du_tru").value) || 1.0;
-        let Itt_cb_val = parseFloat(currentResult.Itt_cb);
         let Itt_chon_cap_val = Itt_cb_val * kDuTru;
 
         doc.autoTable({
@@ -942,18 +972,31 @@ async function generatePDF() {
         doc.setFont("Roboto", "bold");
         doc.text("4. Conclusion - Bill of Materials", 16, finalY + 5.5);
 
+        // Chuẩn bị mảng Body cho Bảng Bill of Materials
+        let bom_body = [
+            ['Selected Phase Cable', `${currentResult.phase_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
+            ['Selected Neutral Cable', `${currentResult.n_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
+            ['Circuit Breaker Rating (In)', `${sel_In} A`]
+        ];
+
+        // Nếu có chỉnh định, chèn thêm hàng k và Ir
+        if (sel_k < 1.0) {
+            bom_body.push(['CB Setting Factor (k)', `${sel_k}`]);
+            bom_body.push(['Thermal Protection (Ir)', `${sel_Ir.toFixed(2)} A`]);
+        } else {
+            bom_body.push(['Thermal Protection (Ir = In)', `${sel_In} A`]);
+        }
+
+        // Chốt lại bằng dòng cắt Icu
+        bom_body.push(['Short-Circuit Breaking Capacity (Icu)', `≥ ${currentResult.cb_Icu} kA`]);
+
         doc.autoTable({
             startY: finalY + 10,
             theme: 'grid',
             pageBreak: 'avoid',
             styles: { fontSize: 10, textColor: 0, font: "Roboto" },
             columnStyles: { 0: { cellWidth: 95, fillColor: [250, 250, 250], fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: [0, 102, 51] } },
-            body: [
-                ['Selected Phase Cable', `${currentResult.phase_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
-                ['Selected Neutral Cable', `${currentResult.n_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
-                ['Circuit Breaker Rating (In)', `${currentResult.cb_In} A`],
-                ['Short-Circuit Breaking Capacity (Icu)', `≥ ${currentResult.cb_Icu} kA`]
-            ],
+            body: bom_body,
             margin: { top: 35, bottom: 25, left: 14, right: 14 }
         });
 
@@ -962,29 +1005,21 @@ async function generatePDF() {
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
             
-            // 1. VẼ WATERMARK (NẾU TẢI ẢNH THÀNH CÔNG)
             if (watermark) {
                 doc.saveGraphicsState();
-                doc.setGState(new doc.GState({ opacity: 0.08 })); // Độ mờ 8%
-
-                // Tính toán tỷ lệ ảnh để không bị méo (Max Width = 160mm)
+                doc.setGState(new doc.GState({ opacity: 0.08 })); 
                 let imgWidth = 160;
                 let imgHeight = (watermark.height / watermark.width) * imgWidth;
-
-                // Nếu ảnh quá cao, cố định lại theo chiều cao
                 if (imgHeight > 200) {
                     imgHeight = 160;
                     imgWidth = (watermark.width / watermark.height) * imgHeight;
                 }
-
                 const imgX = (210 - imgWidth) / 2;  
                 const imgY = (297 - imgHeight) / 2; 
-
                 doc.addImage(watermark.base64, 'PNG', imgX, imgY, imgWidth, imgHeight);
                 doc.restoreGraphicsState();
             }
 
-            // 2. Header
             doc.setFontSize(16);
             doc.setTextColor(0, 102, 204);
             doc.setFont("Roboto", "bold");
@@ -1003,7 +1038,6 @@ async function generatePDF() {
             doc.setFont("Roboto", "normal");
             doc.text(`Project: ${projName} | ${timestamp}`, 14, 28);
 
-            // 3. Footer
             doc.setFontSize(7);
             doc.setTextColor(150, 150, 150);
             doc.setFont("Roboto", "italic");
