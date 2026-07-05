@@ -1067,7 +1067,7 @@ async function generatePDF() {
     }
 }
 // ============================================================================
-// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (ĐÃ SỬA LỖI LOGIC K_DỰ_TRỮ)
+// HÀM XUẤT THUYẾT MINH TÍNH TOÁN (ĐÃ FIX LỖI SAI SỐ LÀM TRÒN DÒNG TRA BẢNG)
 // ============================================================================
 function exportExplanation() {
     if(!currentResult) {
@@ -1158,6 +1158,19 @@ function exportExplanation() {
     let neut_n = parseInt(currentResult.n_cable.split('x')[0]);
     let neut_a = parseFloat(currentResult.n_cable.split('x')[1]);
     
+    // --- LẤY CHÍNH XÁC DÒNG TRA BẢNG TỪ BẢNG GỐC MÀ KHÔNG TÍNH NGƯỢC ---
+    let cable_table_ref = null;
+    let cond = currentResult.cond;
+    if (isAir) {
+        cable_table_ref = cond === "Copper" ? cab_cu_air : cab_al_air;
+    } else if (currentResult.routing.includes("trực tiếp")) {
+        cable_table_ref = cond === "Copper" ? cu_ground_direct : al_ground_direct;
+    } else {
+        cable_table_ref = cond === "Copper" ? cu_ground_pipe : al_ground_pipe;
+    }
+    let exact_amp = cable_table_ref[phase_a][currentResult.methodKey]; // Lấy thẳng con số tròn trĩnh
+    // -------------------------------------------------------------------
+
     let R0_phase = currentResult.cond === "Copper" ? (res_cu[phase_a] || 0.01) : (res_al[phase_a] || 0.01);
     let R0_neut = currentResult.cond === "Copper" ? (res_cu[neut_a] || 0.01) : (res_al[neut_a] || 0.01);
     let L = parseFloat(currentResult.length);
@@ -1212,8 +1225,8 @@ function exportExplanation() {
     }
 
     // --- TÍNH TOÁN IEC 60949 ---
-    let k_mat = currentResult.cond === "Copper" ? 226 : 148;
-    let beta = currentResult.cond === "Copper" ? 234.5 : 228;
+    let k_mat = cond === "Copper" ? 226 : 148;
+    let beta = cond === "Copper" ? 234.5 : 228;
     let theta_i = currentResult.insul.includes("XLPE") ? 90 : 70;
     let theta_f = currentResult.insul.includes("XLPE") ? 250 : 160;
     let t_sc = 1; 
@@ -1314,28 +1327,14 @@ function exportExplanation() {
     });
     appendixTablesHTML += `</table>`;
 
-    // 4. BẢNG TRA CÁP (DỌC - GỘP R0, Rt, Iz theo cách xếp cáp)
-    let available_sizes = currentResult.cond === "Copper" ? Object.keys(res_cu) : Object.keys(res_al);
+    // 4. BẢNG TRA CÁP (DỌC)
+    let available_sizes = cond === "Copper" ? Object.keys(res_cu) : Object.keys(res_al);
     available_sizes.sort((a, b) => parseFloat(a) - parseFloat(b));
     
-    // Tìm bảng gốc được dùng
-    let cable_table_ref = null;
-    let routing = currentResult.routing;
-    let cond = currentResult.cond;
-    if (routing === "Đi trên không/thang máng") {
-        cable_table_ref = cond === "Copper" ? cab_cu_air : cab_al_air;
-    } else if (routing.includes("trực tiếp")) {
-        cable_table_ref = cond === "Copper" ? cu_ground_direct : al_ground_direct;
-    } else {
-        cable_table_ref = cond === "Copper" ? cu_ground_pipe : al_ground_pipe;
-    }
-    
-    // Lấy tất cả phương thức xếp cáp (A,B,C,D...) hiện có
     let all_methods = new Set();
     Object.values(cable_table_ref).forEach(obj => Object.keys(obj).forEach(k => all_methods.add(k)));
     let methods_arr = Array.from(all_methods).sort();
 
-    // TẠO TỪ ĐIỂN CHÚ THÍCH PHƯƠNG THỨC XẾP CÁP BẰNG TIẾNG VIỆT
     let legend_dict = isAir ? {
         "A": "<b>PP A:</b> 2 cáp đơn xếp tiếp xúc phẳng (Hệ 1 pha)",
         "B": "<b>PP B:</b> 3 cáp đơn xếp tiếp xúc phẳng (Hệ 3 pha)",
@@ -1360,7 +1359,7 @@ function exportExplanation() {
     legendHTML += `</div></div>`;
 
     appendixTablesHTML += `
-    <h3>[Bảng ${isAir ? "3" : "5"}] Thông số điện trở và Khả năng mang dòng định mức của Cáp ${currentResult.cond === 'Copper' ? 'Đồng (Cu)' : 'Nhôm (Al)'}</h3>
+    <h3>[Bảng ${isAir ? "3" : "5"}] Thông số điện trở và Khả năng mang dòng định mức của Cáp ${cond === 'Copper' ? 'Đồng (Cu)' : 'Nhôm (Al)'}</h3>
     ${legendHTML}
     <table style="width:100%; border-collapse: collapse; font-size: 13px; text-align: center; margin-bottom: 20px; table-layout: fixed;">
         <tr style="background-color: #fce4e4; color: #d32f2f;">
@@ -1484,7 +1483,7 @@ function exportExplanation() {
         <div class="formula">I<sub>z_total</sub> = (I<sub>z_bảng_tra</sub> × K) × số_sợi_song_song ≥ I<sub>tt</sub></div>
         <div class="highlight">
             Căn cứ vòng lặp đối chiếu thuật toán với catalogue cáp cách điện <b>${currentResult.insul}</b>, hệ thống đã đề xuất cấu hình: <b>${currentResult.phase_cable} mm²</b>.<br><br>
-            • Dòng định mức tra bảng của 1 mạch: <b>${(parseFloat(currentResult.Iz_single) / parseFloat(currentResult.overall_K)).toFixed(2)} A</b>. <span style="color:#2563EB;"><i>(Tra tại Bảng ${isAir ? "3" : "5"} Phụ lục)</i></span><br>
+            • Dòng định mức tra bảng của 1 mạch: <b>${exact_amp} A</b>. <span style="color:#2563EB;"><i>(Tra tại Bảng ${isAir ? "3" : "5"} Phụ lục)</i></span><br>
             • Khả năng mang dòng thực tế của 1 mạch (sau hiệu chỉnh K): I<sub>z</sub> = ${currentResult.Iz_single} A.<br>
             • Tổng khả năng mang dòng của thiết kế: <b>I<sub>z_total</sub> = ${currentResult.Iz_total} A</b>.
         </div>
@@ -1498,7 +1497,7 @@ function exportExplanation() {
         <div class="formula">R<sub>t</sub> = R<sub>0</sub> × [1 + α × (θ<sub>f</sub> - 20)]</div>
         <ul>
             <li><b>R<sub>0</sub></b>: Điện trở của lõi ${currentResult.cond === 'Copper' ? 'Đồng (Cu)' : 'Nhôm (Al)'} tiết diện ${phase_a} mm² tại 20°C = <b>${R0_phase} Ω/km</b> <span style="color:#2563EB;"><i>(Tra tại Bảng ${isAir ? "3" : "5"} Phụ lục)</i></span>.</li>
-            <li><b>α</b>: Hệ số nhiệt điện trở của ${currentResult.cond === 'Copper' ? 'Đồng (Cu) là 0.00393' : 'Nhôm (Al) là 0.00403'} K<sup>-1</sup>.</li>
+            <li><b>α</b>: Hệ số nhiệt điện trở của ${cond === 'Copper' ? 'Đồng (Cu) là 0.00393' : 'Nhôm (Al) là 0.00403'} K<sup>-1</sup>.</li>
             <li><b>θ<sub>f</sub></b>: Nhiệt độ cực đại của cách điện ${currentResult.insul} = ${t_fixed}°C.</li>
         </ul>
         <p>➔ Thay số ta được: <b>R<sub>t</sub> = ${currentResult.rt_val} Ω/km</b>.</p>
@@ -1579,7 +1578,7 @@ function exportExplanation() {
         </div>
         <p>Trong đó:</p>
         <ul>
-            <li>K = ${k_mat}, β = ${beta} (Hệ số đối với vật liệu dẫn ${currentResult.cond === "Copper" ? "Đồng Cu" : "Nhôm Al"}).</li>
+            <li>K = ${k_mat}, β = ${beta} (Hệ số đối với vật liệu dẫn ${cond === "Copper" ? "Đồng Cu" : "Nhôm Al"}).</li>
             <li>S = ${phase_a} mm² (Tiết diện của 1 sợi cáp).</li>
             <li>t = ${t_sc} s (Thời gian chịu dòng ngắn mạch).</li>
             <li>θ<sub>i</sub> = ${theta_i}°C (Nhiệt độ hoạt động ban đầu trước khi ngắn mạch của cách điện ${currentResult.insul}).</li>
