@@ -704,7 +704,6 @@ function getWatermarkImage(imageUrl) {
         img.src = imageUrl;
     });
 }
-	// ============================================================================
 // ============================================================================
 // XUẤT PDF TRỰC TIẾP TỪ DỮ LIỆU SỬ DỤNG jsPDF & jsPDF-AutoTable (Native PDF)
 // ============================================================================
@@ -801,7 +800,7 @@ async function generatePDF() {
                 ['1. Information'],
                 ['2. Cable schedule'],
                 ['3. Calculation notes'],
-                ['    3.1. Cable & Environment Parameters'],
+                ['    3.1. Load, Cable & Environment Parameters'],
                 ['    3.2. Voltage Drop Check'],
                 ['    3.3. Short Circuit (Calculation of Isc by the impedance method)'],
                 ['4. Conclusion - Bill of Materials']
@@ -876,13 +875,20 @@ async function generatePDF() {
         doc.setFont("Roboto", "bold");
         doc.text("3. Calculation notes", 16, finalY + 5.5);
 
+        // Logic tính toán lại dòng diện để hiển thị
+        let kDuTru = parseFloat(document.getElementById("k_du_tru").value) || 1.0;
+        let Itt_cb_val = parseFloat(currentResult.Itt_cb);
+        let Itt_chon_cap_val = Itt_cb_val * kDuTru;
+
         doc.autoTable({
             startY: finalY + 10,
             theme: 'grid',
             styles: { fontSize: 9, textColor: 0, font: "Roboto" },
-            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' } },
+            columnStyles: { 0: { cellWidth: 95, fillColor: [250, 250, 250], fontStyle: 'bold' } },
             body: [
-                [{content: '3.1. Cable & Environment Parameters', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
+                [{content: '3.1. Load, Cable & Environment Parameters', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
+                ['Design current for CB selection (I_base)', `${Itt_cb_val.toFixed(2)} A`],
+                ['Design current for Cable selection (I_cable)', `${Itt_chon_cap_val.toFixed(2)} A (Reserve factor: ${kDuTru.toFixed(2)})`],
                 ['Length', `${currentResult.length} m`],
                 ['Installation method', `${currentResult.methodKey} - ${currentResult.methodDisplay}`],
                 ['Insulation', currentResult.insul],
@@ -907,7 +913,7 @@ async function generatePDF() {
             theme: 'grid',
             pageBreak: 'avoid', 
             styles: { fontSize: 9, textColor: 0, font: "Roboto" },
-            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' } },
+            columnStyles: { 0: { cellWidth: 95, fillColor: [250, 250, 250], fontStyle: 'bold' } },
             body: [
                 [{content: '3.2. Voltage Drop Check', colSpan: 2, fontStyle: 'bold', fillColor: [230, 230, 230]}],
                 [`Core temperature (steady state)`, `${currentResult.t_fixed} °C`],
@@ -941,7 +947,7 @@ async function generatePDF() {
             theme: 'grid',
             pageBreak: 'avoid',
             styles: { fontSize: 10, textColor: 0, font: "Roboto" },
-            columnStyles: { 0: { cellWidth: 90, fillColor: [250, 250, 250], fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: [0, 102, 51] } },
+            columnStyles: { 0: { cellWidth: 95, fillColor: [250, 250, 250], fontStyle: 'bold' }, 1: { fontStyle: 'bold', textColor: [0, 102, 51] } },
             body: [
                 ['Selected Phase Cable', `${currentResult.phase_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
                 ['Selected Neutral Cable', `${currentResult.n_cable} mm2 ${currentResult.cond} (${currentResult.insul})`],
