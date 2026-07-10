@@ -439,18 +439,33 @@ function updateDynamicK() {
     document.getElementById("dynamic_k_display").innerText = `📊 Hệ số K áp dụng (Xác định cho cấu hình ${ref_n} mạch): ${K.toFixed(4)}`;
 }
 
-function calcNeutral(area, num, condType) {
+function calcNeutral(area, num, condType, sysType) {
     let tot_phase = area * num;
-    let limit = condType === "Copper" ? 16.0 : 25.0;
-    let req = tot_phase <= limit ? tot_phase : tot_phase / 2.0;
-    let idx = standard_sizes.indexOf(area);
-    let allowed = idx !== -1 ? standard_sizes.slice(Math.max(0, idx - 2), Math.min(standard_sizes.length - 1, idx + 1) + 1) : standard_sizes;
-    
+    let req = tot_phase; // Mặc định dây N = dây Pha (áp dụng cho cả hệ 1 pha)
+
+    // CHỈ giảm tiết diện dây N khi là hệ 3 pha và vượt ngưỡng quy định
+    if (sysType === "3 pha") {
+        let limit = condType === "Copper" ? 16.0 : 25.0;
+        if (tot_phase > limit) {
+            req = tot_phase / 2.0;
+        }
+    }
+
     let bestA = area, bestN = num, minA = Infinity;
-    for(let s of allowed) {
+    
+    // Duyệt toàn bộ bảng tiết diện chuẩn (không dùng slice để tránh lỗi bỏ sót tiết diện tối ưu)
+    for(let s of standard_sizes) {
         let count = Math.ceil(req / s);
-        if(s * count >= req && (s * count < minA || (s * count === minA && count < bestN))) {
-            minA = s * count; bestA = s; bestN = count;
+        let current_tot = s * count;
+        
+        // Cập nhật cấu hình ưu tiên:
+        // 1. Tổng tiết diện đáp ứng >= yêu cầu
+        // 2. Tổng tiết diện là nhỏ nhất (gần sát req nhất)
+        // 3. Nếu cùng tổng tiết diện, ưu tiên phương án có số sợi cáp (count) ít hơn
+        if(current_tot >= req && (current_tot < minA || (current_tot === minA && count < bestN))) {
+            minA = current_tot; 
+            bestA = s; 
+            bestN = count;
         }
     }
     return {n: bestN, a: bestA};
@@ -539,7 +554,7 @@ function runCalculation() {
     }
 
     valids.sort((x,y) => x.tot !== y.tot ? x.tot - y.tot : (x.n !== y.n ? x.n - y.n : x.a - y.a));
-    let best = valids[0]; let neut = calcNeutral(best.a, best.n, cond);
+    let best = valids[0]; let neut = calcNeutral(best.a, best.n, cond, sysType);
 
     let sba = parseFloat(document.getElementById("s_ba").value);
     let uk = parseFloat(document.getElementById("u_k").value);
